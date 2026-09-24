@@ -3,6 +3,12 @@
 # Local agent instructions
 AGENTS.md
 
+# Agent context files (private, not product surface)
+CODEBASE_SUMMARY.md
+ARQUITECTURE.md
+CHANGELOG_CONTEXT.md
+TODO.md
+
 # Private design and research notes
 .internal/
 
@@ -22,3 +28,6 @@ coverage.html
 *.bundle.json
 /dist/
 /tmp/
+
+# Harness
+.zcode/
