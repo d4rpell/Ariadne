@@ -1,0 +1,24 @@
+# Public repository surface
+
+# Local agent instructions
+AGENTS.md
+
+# Private design and research notes
+.internal/
+
+# Local development files
+.env
+.env.*
+*.local
+
+# Go build and test output
+/bin/
+/build/
+coverage.out
+coverage.html
+
+# Generated reports and evidence bundles
+*.evidence.json
+*.bundle.json
+/dist/
+/tmp/
