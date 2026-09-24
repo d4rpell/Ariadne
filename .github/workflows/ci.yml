@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: offline gates (linux/amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # make check runs: gofmt, vet, build, test, golden vectors, race, import boundary.
+      # Absent on purpose: lint and gosec (AX-07), evaluator determinism (A1-04),
+      # arm64 golden outputs (A2-05).
+      - name: Gates
+        run: make check
