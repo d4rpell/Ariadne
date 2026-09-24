@@ -377,6 +377,30 @@ func TestValidateRunProvenanceRejectsInvertedRunTimes(t *testing.T) {
 	}
 }
 
+// TestValidateRunProvenanceAcceptsAbsentRunTimestamps fixes the optionality of
+// ADR-0006 §2: started_at and ended_at are optional, so a run that recorded no
+// times, or only one of them, is representable.
+func TestValidateRunProvenanceAcceptsAbsentRunTimestamps(t *testing.T) {
+	withoutTimes := testProvenance(t)
+	withoutTimes.StartedAt = nil
+	withoutTimes.EndedAt = nil
+	if err := validateRunProvenance(withoutTimes); err != nil {
+		t.Fatalf("a run without started_at and ended_at must be representable: %v", err)
+	}
+
+	onlyStarted := testProvenance(t)
+	onlyStarted.EndedAt = nil
+	if err := validateRunProvenance(onlyStarted); err != nil {
+		t.Fatalf("a run with only started_at must be representable: %v", err)
+	}
+
+	onlyEnded := testProvenance(t)
+	onlyEnded.StartedAt = nil
+	if err := validateRunProvenance(onlyEnded); err != nil {
+		t.Fatalf("a run with only ended_at must be representable: %v", err)
+	}
+}
+
 func TestValidateEvidenceItemRejectsIncompleteItems(t *testing.T) {
 	empty := ""
 	mutations := map[string]func(*EvidenceItem){

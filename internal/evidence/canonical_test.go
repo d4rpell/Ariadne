@@ -360,6 +360,30 @@ func TestCanonicalJSONPreservesDuplicates(t *testing.T) {
 	}
 }
 
+// TestCanonicalJSONEmitsAbsentRunTimestampsAsNull covers ADR-0006 §2 for the two
+// optional run timestamps: the wire emits null, the envelope changes and the
+// digest does not, because §1(a) excludes them from the projection.
+func TestCanonicalJSONEmitsAbsentRunTimestampsAsNull(t *testing.T) {
+	base := testGoldenBundle(t)
+	baseEnvelope := string(canonicalEnvelope(t, base))
+	baseHash := hashOf(t, base)
+
+	withoutTimes := testGoldenBundle(t)
+	withoutTimes.Provenance.StartedAt = nil
+	withoutTimes.Provenance.EndedAt = nil
+
+	encoded := string(canonicalEnvelope(t, withoutTimes))
+	if !strings.Contains(encoded, `"started_at":null,"ended_at":null`) {
+		t.Fatalf("absent run timestamps must be emitted as null: %s", encoded)
+	}
+	if encoded == baseEnvelope {
+		t.Fatal("removing the run timestamps must change the envelope")
+	}
+	if hashOf(t, withoutTimes) != baseHash {
+		t.Fatal("started_at and ended_at are excluded from the digest, so removing them must keep it")
+	}
+}
+
 func TestCanonicalJSONKeepsEmptyArraysAndNulls(t *testing.T) {
 	encoded := string(canonicalEnvelope(t, testImportBundle(t)))
 	for _, empty := range []string{
