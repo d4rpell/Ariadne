@@ -4,7 +4,7 @@
 >
 > Turns a container vulnerability finding into a reproducible, auditable evidence record — without executing code inside the pod.
 
-**Status: PRE-ALPHA (design phase).** This repository currently contains the project specification. There is no code yet. Interfaces, schemas and command names described below are design targets, not shipped features.
+**Status: PRE-ALPHA (design phase).** The repository contains the project specification and a first implementation slice: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing, covered by tests. The CLI, the input adapters and the evaluator do not exist yet; interfaces, schemas and command names described below are design targets, not shipped features.
 
 ## The problem
 
