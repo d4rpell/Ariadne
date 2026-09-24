@@ -423,6 +423,20 @@ func TestValidateEvidenceItemAcceptsUnavailableWithoutValue(t *testing.T) {
 	}
 }
 
+// TestValidateEvidenceItemRequiresObservedAtForUnavailable fixes ADR-0006 §2:
+// the optional timestamps are only those of the image and the run, never the one
+// of an evidence item.
+func TestValidateEvidenceItemRequiresObservedAtForUnavailable(t *testing.T) {
+	item := testItem(t)
+	item.Confidence = ProvenanceUnavailable
+	item.Value = nil
+	item.ValueHash = nil
+	item.ObservedAt = nil
+	if err := ValidateEvidenceItem(item, testSubject()); err == nil {
+		t.Fatal("unavailable evidence was accepted without observed_at")
+	}
+}
+
 func TestValidateEvidenceItemKeepsUnknownWarningCodes(t *testing.T) {
 	item := testItem(t)
 	item.Warnings = []Warning{{Code: "future_code", Class: WarningInformational, Message: "uninterpretable by this version"}}
