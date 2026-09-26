@@ -105,6 +105,8 @@ The public demo runs entirely on synthetic fixtures and requires no access to pr
 
 User and contributor documentation lives in [`docs/`](docs/). It will grow as the implementation lands: architecture, evidence schema, rule pack format, compatibility matrix and decision model.
 
+Decision records live in [`docs/adr/`](docs/adr/README.md): every decision that shapes the product is written down with the alternatives that were considered, the reasons the chosen option was the best available at the time, the limits it introduces and the conditions that would justify revisiting it. That is where the answer to “why does it work this way?” belongs — including the decisions that deliberately *reduce* what the tool claims.
+
 ## Confidentiality
 
 This project was designed from experience in regulated environments, but it contains **no client or employer data**: no real CSVs, no namespace/cluster/pod names, no internal scripts or procedures. All examples are synthetic.

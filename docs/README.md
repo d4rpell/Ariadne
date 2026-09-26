@@ -11,4 +11,8 @@ Content will grow alongside the implementation:
 - `compatibility.md` — verified Kubernetes and OpenShift releases
 - `quickstart.md` — installation and first run
 
+Already available:
+
+- [`adr/`](adr/README.md) — the **decision records**: what was decided, the alternatives considered, why the chosen option was the best available at the time, and the conditions that would justify revisiting it. This is the place to look when the question is “why does it work this way?” rather than “how do I run it?”.
+
 Until the first release, the [project README](../README.md) is the source of truth for what Ariadne is and what it deliberately is not.
