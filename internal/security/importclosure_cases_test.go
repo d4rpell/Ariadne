@@ -137,7 +137,11 @@ func TestImportClosureFailClosed(t *testing.T) {
 			"go.mod":                syntheticModule,
 			"internal/core/core.go": "package core\n\nimport \"example.test/synthetic/internal/absent\"\n\nvar _ = absent.Value\n",
 		})
-		expectFinding(t, analyzeClosure(t, root, syntheticCorePolicy()), "unresolved local import")
+		findings := analyzeClosure(t, root, syntheticCorePolicy())
+		expectFinding(t, findings, "unresolved local import")
+		// The reason travels with the finding, which is what makes a rejection
+		// reviewable on every platform, not only where links can be created.
+		expectFinding(t, findings, "does not exist")
 	})
 
 	t.Run("unparseable source", func(t *testing.T) {

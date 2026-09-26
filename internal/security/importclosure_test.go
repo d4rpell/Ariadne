@@ -157,7 +157,9 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 				case importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/"):
 					target, err := localDir(root, strings.TrimPrefix(strings.TrimPrefix(importPath, modulePath), "/"))
 					if err != nil {
-						findings = append(findings, closureFinding{chain: location, detail: "unresolved local import " + importPath})
+						// The reason travels with the finding: a link, an escape or an
+						// absent directory must be reviewable without a debugger.
+						findings = append(findings, closureFinding{chain: location, detail: "unresolved local import " + importPath + ": " + err.Error()})
 						continue
 					}
 					edges[dir] = append(edges[dir], target)
