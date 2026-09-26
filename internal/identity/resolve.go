@@ -90,6 +90,8 @@ func equivalentObservation(bindings []ImageBinding, indexes []int) bool {
 			baseline.SourceHash != candidate.SourceHash ||
 			baseline.Locator != candidate.Locator ||
 			baseline.Platform != candidate.Platform ||
+			baseline.PlatformOS != candidate.PlatformOS ||
+			baseline.PlatformArchitecture != candidate.PlatformArchitecture ||
 			!reflect.DeepEqual(baseline.RawImageID, candidate.RawImageID) ||
 			!reflect.DeepEqual(baseline.GuaranteedDigest, candidate.GuaranteedDigest) ||
 			!reflect.DeepEqual(baseline.ObservedAt, candidate.ObservedAt) {

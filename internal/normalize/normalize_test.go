@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/d4rpell/Ariadne/internal/identity"
 	"github.com/d4rpell/Ariadne/internal/ingest"
@@ -335,6 +336,107 @@ func TestNormalizeReusesIdenticalObservationAcrossFindings(t *testing.T) {
 	}
 	if result.Findings[0].Source.Description != "first" || result.Findings[1].Source.Description != "second" {
 		t.Fatalf("source descriptions were not preserved: %q / %q", result.Findings[0].Source.Description, result.Findings[1].Source.Description)
+	}
+}
+
+func TestNormalizeComposesRequestedImagePerFinding(t *testing.T) {
+	imported := parseImport(t,
+		syntheticRowFor("CVE-2024-0001", "registry.example", "app", "release", "High", "first"),
+		syntheticRowFor("CVE-2024-0002", "registry.example", "app", "stable", "Critical", "second"),
+	)
+	result, err := Normalize(Input{Import: imported})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"registry.example/app:release", "registry.example/app:stable"}
+	for i, finding := range result.Findings {
+		if finding.RequestedImage == nil {
+			t.Fatalf("finding %d: requested image not composed", i)
+		}
+		if string(*finding.RequestedImage) != want[i] {
+			t.Fatalf("finding %d: requested image = %q, want %q", i, *finding.RequestedImage, want[i])
+		}
+		if strings.Contains(string(*finding.RequestedImage), "@") {
+			t.Fatalf("finding %d: composed reference carries a digest", i)
+		}
+	}
+	if result.Findings[0].DeclaredImage == result.Findings[1].DeclaredImage {
+		t.Fatal("distinct declarations collapsed while composing the reference")
+	}
+	if result.Findings[0].DeclaredImage.Tag != "release" || result.Findings[1].DeclaredImage.Tag != "stable" {
+		t.Fatal("declared tags were rewritten instead of preserved verbatim")
+	}
+}
+
+func TestNormalizeLeavesRequestedImageUnrepresented(t *testing.T) {
+	registry := "my registry"
+	imported := parseImport(t, syntheticRowFor("CVE-2024-0001", registry, "app", "release", "High", "text"))
+	if len(imported.Findings) != 1 {
+		t.Fatalf("parser fixture: findings = %d, want 1", len(imported.Findings))
+	}
+	result, err := Normalize(Input{Import: imported})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	finding := result.Findings[0]
+	if finding.RequestedImage != nil {
+		t.Fatalf("declaration outside the canonical grammar produced %q", *finding.RequestedImage)
+	}
+	if finding.DeclaredImage.Registry != registry || finding.DeclaredImage.Repository != "app" || finding.DeclaredImage.Tag != "release" {
+		t.Fatalf("declared components not preserved for diagnosis: %+v", finding.DeclaredImage)
+	}
+	if finding.Source.VulnerabilityID != "CVE-2024-0001" {
+		t.Fatal("source fact lost while the reference stayed unrepresented")
+	}
+}
+
+// TestNormalizeDetachesObservationPointers pins the no-alias rule: the result
+// must not change under a caller that keeps writing to the observation it passed
+// in, and the caller must not be able to rewrite what the result asserts.
+func TestNormalizeDetachesObservationPointers(t *testing.T) {
+	imported := parseImport(t, validRow("CVE-2024-0001"))
+	observedAt, err := contract.NewTimestamp(time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("NewTimestamp: %v", err)
+	}
+	binding := syntheticBinding("api")
+	binding.RequestedImage = requestedImage("reg.example/app:release")
+	binding.RawImageID = rawImageID("reg.example/app@sha256:" + strings.Repeat("ab", 32))
+	binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("cd", 32))
+	binding.ObservedAt = &observedAt
+	failure := &ingest.FileError{Offset: 7, Reason: ingest.ReasonBOM}
+
+	result, err := Normalize(Input{Import: imported, StructuralError: failure, Bindings: []Binding{bindingFor(0, binding)}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	finding := result.Findings[0]
+	if finding.Binding == nil || finding.Binding.RequestedImage == nil || finding.Binding.RawImageID == nil || finding.Binding.GuaranteedDigest == nil || finding.Binding.ObservedAt == nil {
+		t.Fatalf("observation not preserved: %+v", finding.Binding)
+	}
+	if finding.Binding.RequestedImage == binding.RequestedImage ||
+		finding.Binding.RawImageID == binding.RawImageID ||
+		finding.Binding.GuaranteedDigest == binding.GuaranteedDigest ||
+		finding.Binding.ObservedAt == binding.ObservedAt {
+		t.Fatal("binding pointers alias the caller's observation")
+	}
+	if result.Diagnostics.StructuralError == failure {
+		t.Fatal("structural error aliases the caller's value")
+	}
+
+	keptRequested := *finding.Binding.RequestedImage
+	keptRaw := *finding.Binding.RawImageID
+	keptDigest := *finding.Binding.GuaranteedDigest
+	keptOffset := result.Diagnostics.StructuralError.Offset
+	*binding.RequestedImage = contract.RequestedImage("mutated")
+	*binding.RawImageID = contract.RawImageID("mutated")
+	*binding.GuaranteedDigest = contract.NormalizedDigest("mutated")
+	failure.Offset = 999
+	if *finding.Binding.RequestedImage != keptRequested || *finding.Binding.RawImageID != keptRaw || *finding.Binding.GuaranteedDigest != keptDigest {
+		t.Fatal("result changed after the caller rewrote its observation")
+	}
+	if result.Diagnostics.StructuralError.Offset != keptOffset {
+		t.Fatal("structural error changed after the caller rewrote it")
 	}
 }
 

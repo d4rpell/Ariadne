@@ -36,12 +36,18 @@ const (
 
 // NormalizedFinding preserves one accepted source finding plus its declared
 // image and, when an explicit binding exists, its identity resolution.
+// RequestedImage is the reference composed from the declaration by the ADR-0009
+// grammar. It is nil when the declaration is not representable: DeclaredImage
+// keeps the components verbatim, and the consumer must treat a nil reference of
+// a prisma-v1 finding as a blocking condition for that image identity rather
+// than as an absent declaration.
 type NormalizedFinding struct {
-	Source        ingest.Finding
-	DeclaredImage DeclaredImage
-	Binding       *identity.ImageBinding
-	Resolution    *identity.Resolution
-	State         NormalizationState
+	Source         ingest.Finding
+	DeclaredImage  DeclaredImage
+	RequestedImage *contract.RequestedImage
+	Binding        *identity.ImageBinding
+	Resolution     *identity.Resolution
+	State          NormalizationState
 }
 
 // Diagnostics carries ingest rejections and the structural failure for A1-03 to
@@ -79,11 +85,12 @@ type Input struct {
 }
 
 var (
-	errMethodNotImport         = errors.New("normalize: coverage method is not a findings import")
-	errCompletenessNotDeclared = errors.New("normalize: completeness is not declared")
-	errBindingIndexOutOfRange  = errors.New("normalize: binding index is out of range")
-	errBindingIndexDuplicated  = errors.New("normalize: duplicate binding for the same finding")
-	errBindingKeyMismatch      = errors.New("normalize: binding key does not match the image binding key")
+	errMethodNotImport          = errors.New("normalize: coverage method is not a findings import")
+	errCompletenessNotDeclared  = errors.New("normalize: completeness is not declared")
+	errBindingIndexOutOfRange   = errors.New("normalize: binding index is out of range")
+	errBindingIndexDuplicated   = errors.New("normalize: duplicate binding for the same finding")
+	errBindingKeyMismatch       = errors.New("normalize: binding key does not match the image binding key")
+	errResolutionWithoutBinding = errors.New("normalize: resolution carries no binding")
 )
 
 // Normalize consumes one ingest result. It never mutates its input, never
@@ -111,7 +118,7 @@ func Normalize(input Input) (Result, error) {
 		Findings: make([]NormalizedFinding, 0, len(input.Import.Findings)),
 		Diagnostics: Diagnostics{
 			Rejections:      append([]ingest.Rejection{}, input.Import.Rejections...),
-			StructuralError: input.StructuralError,
+			StructuralError: copyStructuralError(input.StructuralError),
 		},
 		Coverage:     copyCoverage(input.Import.Coverage),
 		Completeness: input.Import.Completeness,
@@ -121,16 +128,22 @@ func Normalize(input Input) (Result, error) {
 		boundTo[binding.FindingIndex] = i
 	}
 	for i, finding := range input.Import.Findings {
+		declared := declaredImageFor(finding)
 		normalized := NormalizedFinding{
 			Source:        finding,
-			DeclaredImage: declaredImageFor(finding),
+			DeclaredImage: declared,
 			State:         NormalizationUnbound,
+		}
+		if composed, problem := RequestedImage(declared); problem == nil {
+			normalized.RequestedImage = &composed
 		}
 		if bindingIndex, bound := boundTo[i]; bound {
 			binding := input.Bindings[bindingIndex]
 			resolution := byKey[binding.ContainerKey]
-			image := binding.Image
-			normalized.Binding = &image
+			if resolution.Binding == nil {
+				return Result{}, errResolutionWithoutBinding
+			}
+			normalized.Binding = resolution.Binding
 			normalized.Resolution = &resolution
 			normalized.State = stateFor(resolution, input.Import.Completeness)
 		}
@@ -217,4 +230,15 @@ func copyCoverage(coverage contract.Coverage) contract.Coverage {
 		copied.Rows = &rows
 	}
 	return copied
+}
+
+// copyStructuralError detaches the reported failure from the caller for the same
+// reason the counters are detached: the result must not change under a caller
+// that keeps writing to the value it passed in.
+func copyStructuralError(failure *ingest.FileError) *ingest.FileError {
+	if failure == nil {
+		return nil
+	}
+	copied := *failure
+	return &copied
 }

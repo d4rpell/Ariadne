@@ -172,6 +172,17 @@ func TestResolveRejectsEveryDivergentObservationField(t *testing.T) {
 		},
 		"platform": func(binding ImageBinding) ImageBinding {
 			binding.Platform = contract.PlatformKnown
+			binding.PlatformOS = "linux"
+			binding.PlatformArchitecture = "amd64"
+			binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("ab", 32))
+			return binding
+		},
+		"platform os": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "linux"
+			return binding
+		},
+		"platform architecture": func(binding ImageBinding) ImageBinding {
+			binding.PlatformArchitecture = "amd64"
 			return binding
 		},
 		"raw image id": func(binding ImageBinding) ImageBinding {
@@ -254,6 +265,53 @@ func TestResolveRevalidatesIdenticalRepeatedObservations(t *testing.T) {
 		}
 		if len(resolutions) != 1 || resolutions[0].State == ResolutionResolved || resolutions[0].Binding != nil {
 			t.Errorf("%s: invalid repeated observation resolved: %+v", name, resolutions)
+		}
+	}
+}
+
+func TestResolveRejectsDivergentPlatformCarriers(t *testing.T) {
+	baseline := syntheticBinding("api")
+	baseline.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("ab", 32))
+	baseline.Platform = contract.PlatformKnown
+	baseline.PlatformOS = "linux"
+	baseline.PlatformArchitecture = "amd64"
+
+	identical, err := Resolve([]ImageBinding{baseline, baseline})
+	if err != nil {
+		t.Fatalf("identical platform observation rejected: %v", err)
+	}
+	if len(identical) != 1 || identical[0].State != ResolutionResolved || identical[0].BindingCount != 2 {
+		t.Fatalf("identical platform observation = %+v, want one resolved shared observation", identical)
+	}
+
+	cases := map[string]func(ImageBinding) ImageBinding{
+		"other architecture": func(binding ImageBinding) ImageBinding {
+			binding.PlatformArchitecture = "arm64"
+			return binding
+		},
+		"other os": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "windows"
+			return binding
+		},
+		"carrier dropped": func(binding ImageBinding) ImageBinding {
+			binding.Platform = contract.PlatformUnknown
+			binding.PlatformOS = ""
+			binding.PlatformArchitecture = ""
+			return binding
+		},
+	}
+	for name, mutate := range cases {
+		resolutions, resolveErr := Resolve([]ImageBinding{baseline, mutate(baseline)})
+		if resolveErr == nil {
+			t.Errorf("%s: divergent platform carriers accepted", name)
+			continue
+		}
+		if len(resolutions) != 1 || resolutions[0].State != ResolutionUnknown {
+			t.Errorf("%s: resolutions = %+v, want one unknown resolution", name, resolutions)
+			continue
+		}
+		if resolutions[0].ConflictCode != ConflictSourceConflict {
+			t.Errorf("%s: conflict code = %q, want %q", name, resolutions[0].ConflictCode, ConflictSourceConflict)
 		}
 	}
 }

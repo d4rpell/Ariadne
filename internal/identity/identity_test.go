@@ -140,16 +140,121 @@ func TestResolveOneRefusesUndeclaredPlatform(t *testing.T) {
 	}
 }
 
-func TestResolveOneRefusesKnownPlatformWithoutCarrier(t *testing.T) {
+func TestResolveOneAcceptsKnownPlatformWithCarrier(t *testing.T) {
 	binding := syntheticBinding("api")
 	binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("ab", 32))
 	binding.Platform = contract.PlatformKnown
+	binding.PlatformOS = "linux"
+	binding.PlatformArchitecture = "amd64"
+
 	resolution, err := ResolveOne(binding)
-	if err == nil {
-		t.Fatal("platform known accepted although this version carries no os or architecture")
+	if err != nil {
+		t.Fatalf("observed platform rejected: %v", err)
 	}
-	if resolution.State == ResolutionResolved {
-		t.Fatal("unsupported platform claim resolved affirmatively")
+	if resolution.State != ResolutionResolved {
+		t.Fatalf("state = %q, want %q", resolution.State, ResolutionResolved)
+	}
+	if resolution.Binding.PlatformOS != "linux" || resolution.Binding.PlatformArchitecture != "amd64" {
+		t.Fatalf("observed platform not preserved: %+v", resolution.Binding)
+	}
+	if resolution.Binding.Platform != contract.PlatformKnown {
+		t.Fatalf("status = %q, want %q", resolution.Binding.Platform, contract.PlatformKnown)
+	}
+}
+
+func TestResolveOneRefusesInvalidPlatformCarrier(t *testing.T) {
+	cases := map[string]func(ImageBinding) ImageBinding{
+		"known without carrier": func(binding ImageBinding) ImageBinding {
+			return binding
+		},
+		"known with os only": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "linux"
+			return binding
+		},
+		"known with architecture only": func(binding ImageBinding) ImageBinding {
+			binding.PlatformArchitecture = "amd64"
+			return binding
+		},
+		"known with blank os": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "   "
+			binding.PlatformArchitecture = "amd64"
+			return binding
+		},
+		"known with os surrounding space": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = " linux"
+			binding.PlatformArchitecture = "amd64"
+			return binding
+		},
+		"known with non ascii architecture": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "linux"
+			binding.PlatformArchitecture = "amd64\xff"
+			return binding
+		},
+		"known without digest": func(binding ImageBinding) ImageBinding {
+			binding.GuaranteedDigest = nil
+			binding.PlatformOS = "linux"
+			binding.PlatformArchitecture = "amd64"
+			return binding
+		},
+	}
+	for name, mutate := range cases {
+		binding := syntheticBinding("api")
+		binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("ab", 32))
+		binding.Platform = contract.PlatformKnown
+		binding = mutate(binding)
+
+		resolution, err := ResolveOne(binding)
+		if err == nil {
+			t.Errorf("%s: accepted, want rejection", name)
+		}
+		if resolution.State == ResolutionResolved {
+			t.Errorf("%s: resolved affirmatively", name)
+		}
+		if resolution.Binding != nil {
+			t.Errorf("%s: refused input still returned a binding", name)
+		}
+	}
+}
+
+func TestResolveOneRefusesUnobservedPlatformCarrier(t *testing.T) {
+	cases := map[string]func(ImageBinding) ImageBinding{
+		"unknown with observed os": func(binding ImageBinding) ImageBinding {
+			binding.PlatformOS = "linux"
+			return binding
+		},
+		"unknown with observed architecture": func(binding ImageBinding) ImageBinding {
+			binding.PlatformArchitecture = "amd64"
+			return binding
+		},
+	}
+	for name, mutate := range cases {
+		binding := mutate(syntheticBinding("api"))
+		binding.RawImageID = rawImageID("registry.example/app@sha256:" + strings.Repeat("ab", 32))
+		resolution, err := ResolveOne(binding)
+		if err == nil {
+			t.Errorf("%s: accepted, want rejection", name)
+		}
+		if resolution.State == ResolutionResolved || resolution.Binding != nil {
+			t.Errorf("%s: unobserved platform carrier resolved: %+v", name, resolution)
+		}
+	}
+}
+
+// TestResolveOneNeverInfersPlatform pins invariant I-5: with no observation the
+// carrier stays empty, so nothing is taken from the host, the build or the
+// architecture of the running process.
+func TestResolveOneNeverInfersPlatform(t *testing.T) {
+	binding := syntheticBinding("api")
+	binding.RawImageID = rawImageID("registry.example/app@sha256:" + strings.Repeat("ab", 32))
+	resolution, err := ResolveOne(binding)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolution.Binding.Platform != contract.PlatformUnknown {
+		t.Fatalf("status = %q, want %q", resolution.Binding.Platform, contract.PlatformUnknown)
+	}
+	if resolution.Binding.PlatformOS != "" || resolution.Binding.PlatformArchitecture != "" {
+		t.Fatalf("platform fabricated: os=%q arch=%q", resolution.Binding.PlatformOS, resolution.Binding.PlatformArchitecture)
 	}
 }
 
@@ -282,6 +387,61 @@ func TestResolveOneFabricatesNothing(t *testing.T) {
 	}
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("resolution is not deterministic across identical calls")
+	}
+}
+
+// TestIndexDigestIsKeptAsRawWithUnknownPlatform pins the ADR-0010 rule: a digest
+// that is not proven to be a per-platform manifest never becomes a guaranteed
+// digest. It is preserved as the observed raw image ID, with no digest and no
+// platform claim, so no conclusion is transferred across platforms.
+func TestIndexDigestIsKeptAsRawWithUnknownPlatform(t *testing.T) {
+	indexDigest := "registry.example/app@sha256:" + strings.Repeat("ab", 32)
+	binding := syntheticBinding("api")
+	binding.RawImageID = rawImageID(indexDigest)
+
+	resolution, err := ResolveOne(binding)
+	if err != nil {
+		t.Fatalf("observed raw image ID rejected: %v", err)
+	}
+	if resolution.State != ResolutionResolved {
+		t.Fatalf("state = %q, want %q: the observation is preserved", resolution.State, ResolutionResolved)
+	}
+	if resolution.Binding.RawImageID == nil || *resolution.Binding.RawImageID != contract.RawImageID(indexDigest) {
+		t.Fatal("observed raw image ID was not preserved verbatim")
+	}
+	if resolution.Binding.GuaranteedDigest != nil {
+		t.Fatal("an index digest was promoted to a guaranteed digest")
+	}
+	if resolution.Binding.Platform != contract.PlatformUnknown || resolution.Binding.PlatformOS != "" || resolution.Binding.PlatformArchitecture != "" {
+		t.Fatalf("platform claimed from a digest: %+v", resolution.Binding)
+	}
+}
+
+// TestResolveOneDetachesObservationPointers pins the no-alias rule for the
+// resolution: the caller cannot rewrite what a resolution asserts, and the
+// resolution cannot rewrite what the caller still holds.
+func TestResolveOneDetachesObservationPointers(t *testing.T) {
+	binding := syntheticBinding("api")
+	binding.RequestedImage = requestedImage("registry.example/app:release")
+	binding.RawImageID = rawImageID("registry.example/app@sha256:" + strings.Repeat("ab", 32))
+	binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("cd", 32))
+
+	resolution, err := ResolveOne(binding)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolution.Binding.RequestedImage == binding.RequestedImage ||
+		resolution.Binding.RawImageID == binding.RawImageID ||
+		resolution.Binding.GuaranteedDigest == binding.GuaranteedDigest {
+		t.Fatal("resolution aliases the caller's observation")
+	}
+
+	keptRaw := *resolution.Binding.RawImageID
+	keptDigest := *resolution.Binding.GuaranteedDigest
+	*binding.RawImageID = contract.RawImageID("mutated")
+	*binding.GuaranteedDigest = contract.NormalizedDigest("mutated")
+	if *resolution.Binding.RawImageID != keptRaw || *resolution.Binding.GuaranteedDigest != keptDigest {
+		t.Fatal("resolution changed after the caller rewrote its observation")
 	}
 }
 

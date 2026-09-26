@@ -39,17 +39,22 @@ type ContainerKey struct {
 // never copied onto an observed one. GuaranteedDigest must come from
 // NewGuaranteedDigest and its format is re-checked on every resolution, so a
 // value placed on the field directly is refused instead of being believed.
+// PlatformOS and PlatformArchitecture carry an observed platform (ADR-0009):
+// they are empty unless the source observed them, and PlatformKnown requires
+// both together with a guaranteed digest.
 type ImageBinding struct {
-	Key              ContainerKey
-	InputKind        InputKind
-	SourceName       string
-	SourceHash       contract.SourceHash
-	Locator          contract.SourceLocator
-	RequestedImage   *contract.RequestedImage
-	RawImageID       *contract.RawImageID
-	GuaranteedDigest *contract.NormalizedDigest
-	Platform         contract.PlatformStatus
-	ObservedAt       *contract.Timestamp
+	Key                  ContainerKey
+	InputKind            InputKind
+	SourceName           string
+	SourceHash           contract.SourceHash
+	Locator              contract.SourceLocator
+	RequestedImage       *contract.RequestedImage
+	RawImageID           *contract.RawImageID
+	GuaranteedDigest     *contract.NormalizedDigest
+	Platform             contract.PlatformStatus
+	PlatformOS           string
+	PlatformArchitecture string
+	ObservedAt           *contract.Timestamp
 }
 
 // ResolutionState is an internal conservative outcome. It is not a decision
@@ -78,16 +83,18 @@ type Resolution struct {
 }
 
 var (
-	errKeyNotIdentifier        = errors.New("identity: container key is not an identifier")
-	errKeyClassInvalid         = errors.New("identity: container class is not one of regular, init, ephemeral")
-	errInputKindUnsupported    = errors.New("identity: input kind is not supported by this version")
-	errPlatformNotDeclared     = errors.New("identity: platform status is not declared")
-	errPlatformKnownNoCarrier  = errors.New("identity: platform known is not transportable by this version")
-	errDigestNotGuaranteed     = errors.New("identity: digest is not in an unambiguous format")
-	errDigestNotProven         = errors.New("identity: guaranteed digest is not in the proven format")
-	errImageRefNotIdentifier   = errors.New("identity: requested image is not an identifier")
-	errRawImageIDNotIdentifier = errors.New("identity: raw image id is not an identifier")
-	errBindingConflict         = errors.New("identity: conflicting bindings for the same container key")
+	errKeyNotIdentifier            = errors.New("identity: container key is not an identifier")
+	errKeyClassInvalid             = errors.New("identity: container class is not one of regular, init, ephemeral")
+	errInputKindUnsupported        = errors.New("identity: input kind is not supported by this version")
+	errPlatformNotDeclared         = errors.New("identity: platform status is not declared")
+	errPlatformKnownNoCarrier      = errors.New("identity: platform known requires observed os and architecture")
+	errPlatformKnownWithoutDigest  = errors.New("identity: platform known requires a digest proven by the source")
+	errPlatformUnknownWithObserved = errors.New("identity: platform unknown cannot carry an observed os or architecture")
+	errDigestNotGuaranteed         = errors.New("identity: digest is not in an unambiguous format")
+	errDigestNotProven             = errors.New("identity: guaranteed digest is not in the proven format")
+	errImageRefNotIdentifier       = errors.New("identity: requested image is not an identifier")
+	errRawImageIDNotIdentifier     = errors.New("identity: raw image id is not an identifier")
+	errBindingConflict             = errors.New("identity: conflicting bindings for the same container key")
 )
 
 // digestPrefix and sha256HexLength define the only digest form this package
@@ -100,8 +107,14 @@ const (
 )
 
 // NewGuaranteedDigest returns a digest whose format this package has verified.
-// A value converted directly without it is refused when consumed: ResolveOne
-// re-checks the format of every digest a binding carries.
+// The caller asserts that the digest was proven to reference the artifact
+// content for the observed platform: an index digest that aggregates
+// per-platform manifests is never passed here, it is preserved as the observed
+// raw image ID with an unknown platform (ADR-0010). A value converted directly
+// without this constructor is refused when consumed: ResolveOne re-checks the
+// format of every digest a binding carries. Provenance of the assertion itself
+// cannot be proven by this package: it is established by the evidence items and
+// their provenance fields, and produced by a reviewed adapter (ADR-0010).
 func NewGuaranteedDigest(value string) (contract.NormalizedDigest, error) {
 	if !digestFormatGuaranteed(value) {
 		return "", errDigestNotGuaranteed
@@ -136,13 +149,13 @@ func ResolveOne(binding ImageBinding) (Resolution, error) {
 	if err := inputKindProblem(binding.InputKind); err != nil {
 		return resolution, err
 	}
-	if err := platformProblem(binding.Platform); err != nil {
+	if err := platformProblem(binding); err != nil {
 		return resolution, err
 	}
 	if err := imageProblem(binding); err != nil {
 		return resolution, err
 	}
-	kept := binding
+	kept := copyBinding(binding)
 	resolution.Binding = &kept
 	if affirmativeEvidence(binding) {
 		resolution.State = ResolutionResolved
@@ -150,6 +163,31 @@ func ResolveOne(binding ImageBinding) (Resolution, error) {
 		resolution.State = ResolutionUnresolved
 	}
 	return resolution, nil
+}
+
+// copyBinding detaches the observation from the caller: the pointers a binding
+// carries are copied, so a consumer of a resolution cannot rewrite values the
+// caller still holds, and the caller cannot rewrite what the resolution
+// asserts.
+func copyBinding(binding ImageBinding) ImageBinding {
+	copied := binding
+	if binding.RequestedImage != nil {
+		value := *binding.RequestedImage
+		copied.RequestedImage = &value
+	}
+	if binding.RawImageID != nil {
+		value := *binding.RawImageID
+		copied.RawImageID = &value
+	}
+	if binding.GuaranteedDigest != nil {
+		value := *binding.GuaranteedDigest
+		copied.GuaranteedDigest = &value
+	}
+	if binding.ObservedAt != nil {
+		value := *binding.ObservedAt
+		copied.ObservedAt = &value
+	}
+	return copied
 }
 
 // affirmativeEvidence holds the whole criterion for "content identity
@@ -170,16 +208,27 @@ func keyProblem(key ContainerKey) error {
 	return nil
 }
 
-// platformProblem refuses an undeclared status and also a "known" claim: this
-// version carries no observed os and architecture, so a known platform could not
-// become a valid image identity later. Platform is never inferred from the host,
-// the build or the architecture of the running process.
-func platformProblem(status contract.PlatformStatus) error {
-	switch status {
+// platformProblem validates the declared platform together with its carrier
+// (ADR-0009). A known platform needs both observed fields, each an identifier,
+// and a digest proven by the source, because the wire cannot express a known
+// platform without one. An unknown platform carries neither field: an observed
+// value there would be lost on the wire and is refused rather than dropped.
+// Platform is never inferred from the host, the build or the process.
+func platformProblem(binding ImageBinding) error {
+	switch binding.Platform {
 	case contract.PlatformUnknown:
+		if binding.PlatformOS != "" || binding.PlatformArchitecture != "" {
+			return errPlatformUnknownWithObserved
+		}
 		return nil
 	case contract.PlatformKnown:
-		return errPlatformKnownNoCarrier
+		if !identifier(binding.PlatformOS) || !identifier(binding.PlatformArchitecture) {
+			return errPlatformKnownNoCarrier
+		}
+		if binding.GuaranteedDigest == nil {
+			return errPlatformKnownWithoutDigest
+		}
+		return nil
 	default:
 		return errPlatformNotDeclared
 	}
