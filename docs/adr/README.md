@@ -46,6 +46,8 @@ Two rules apply to every record:
 | [ADR-0010](ADR-0010-provenance-scope-and-digest-class.md) | Provenance boundary, container scope collision, digest class | accepted (2026-09-25) |
 | [ADR-0011](ADR-0011-decision-record-policy.md) | Two-layer decision record: what, alternatives, why, limits, revisit conditions | accepted (2026-09-25) |
 | [ADR-0012](ADR-0012-evidence-bundle-integration-precisions.md) | Evidence item mapping, value-hash preimage, source hash and omission semantics | accepted (2026-09-26) |
+| [ADR-0013](ADR-0013-offline-evaluator-contract.md) | Conservative evaluator profile, pack admission and reproducibility | ratified (2026-09-26); implemented, pending acceptance review |
+| [ADR-0014](ADR-0014-static-import-closure.md) | Static closure of local production imports | ratified (2026-09-26); implemented, pending acceptance review |
 
 ## Adding a record
 

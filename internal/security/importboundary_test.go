@@ -13,45 +13,66 @@ import (
 	"testing"
 )
 
-// Import boundaries from ARQUITECTURE.md §8, threat T12.
+// Import boundaries from ARQUITECTURE.md §8 and threat T12, plus the static
+// closure of ADR-0014.
 //
-// Two passes, because neither alone is sufficient:
+// Three passes, because none alone is sufficient:
 //   - `go list -deps` resolves the transitive graph of the package as compiled
-//     for the active build context, which catches indirect dependencies;
+//     for the active build context, which catches indirect dependencies, and the
+//     graph must contain its root: an empty result is a failure, never a pass;
 //   - parsing the package directory catches direct imports in files the active
-//     build context excludes (GOOS, GOARCH, build tags), which the graph misses.
+//     build context excludes (GOOS, GOARCH, build tags), which the graph misses;
+//   - the local closure (analyzeClosure in importclosure_test.go) unions the
+//     imports of every local production source reachable from the root, so a
+//     forbidden import reached through an intermediate local package from an
+//     excluded file is found as well. It fails closed on anything it cannot
+//     resolve instead of omitting it.
 //
 // An entry matches a package that is that path or lives below it, so "net/http"
 // covers net/http/httptest. "net" is matched exactly on purpose: it is the socket
-// API ("no network" in ARQUITECTURE.md §4), while net/url and net/netip do no I/O.
-//
-// Ratified limit (owner, 2026-09-24): a violation reached transitively from a
-// build-tagged file through an intermediate local package is not detected here,
-// because the graph only resolves the active build context and the scan only
-// reads direct imports. This is an intermediate state, not the final T12
-// guarantee: closing it requires a static closure over local packages for every
-// build variant, planned for A1-04/AX-01 under a new ADR.
-func TestImportBoundary(t *testing.T) {
-	boundaries := []struct {
-		name   string
-		target string
-		exact  []string
-		trees  []string
-	}{
-		{
-			name:   "evaluator",
-			target: "../evaluator",
-			exact:  []string{"net"},
-			trees:  []string{"net/http", "os/exec", "k8s.io/client-go"},
-		},
-		{
-			name:   "report",
-			target: "../report",
-			trees:  []string{"os/exec"},
-		},
-	}
+// API ("no network" in ARQUITECTURE.md §4), while net/url and net/netip do no
+// I/O. The core roots (evaluator and rule admission) additionally restrict every
+// standard-library import reachable from them to the allowlist of ADR-0014; that
+// allowlist and the prohibitions are code of this reviewed test, never
+// configuration of a rule pack or of a user.
+type boundaryDeclaration struct {
+	name   string
+	target string
+	dir    string
+	core   bool
+	exact  []string
+	trees  []string
+}
 
-	for _, boundary := range boundaries {
+// importBoundaries is the declared surface of the gate. A policy never comes
+// from a rule pack or from user configuration.
+var importBoundaries = []boundaryDeclaration{
+	{
+		name:   "evaluator",
+		target: "../evaluator",
+		dir:    "internal/evaluator",
+		core:   true,
+		exact:  []string{"net"},
+		trees:  []string{"net/http", "os/exec", "k8s.io/client-go"},
+	},
+	{
+		name:   "rulepack",
+		target: "../rulepack",
+		dir:    "internal/rulepack",
+		core:   true,
+		exact:  []string{"net"},
+		trees:  []string{"net/http", "os/exec", "k8s.io/client-go"},
+	},
+	{
+		name:   "report",
+		target: "../report",
+		dir:    "internal/report",
+		trees:  []string{"os/exec"},
+	},
+}
+
+func TestImportBoundary(t *testing.T) {
+	for _, boundary := range importBoundaries {
 		t.Run(boundary.name, func(t *testing.T) {
 			resolved := goListLines(t, "-f", "{{.ImportPath}}", boundary.target)
 			if len(resolved) != 1 {
@@ -75,6 +96,20 @@ func TestImportBoundary(t *testing.T) {
 				if banned := forbiddenMatch(found.path, boundary.exact, boundary.trees); banned != "" {
 					t.Errorf("%s: %s imports %s, forbidden by the import boundary (%s)", importPath, found.file, found.path, banned)
 				}
+			}
+
+			// The closure is reached through this test on purpose: the gate the
+			// Makefile names selects this function, so a closure failure must
+			// fail here and not only in the analyzer's own cases.
+			closure := analyzeClosure(t, moduleRoot(t), closurePolicy{
+				name:  boundary.name,
+				dir:   boundary.dir,
+				core:  boundary.core,
+				exact: boundary.exact,
+				trees: boundary.trees,
+			})
+			for _, finding := range closure {
+				t.Errorf("import closure: %s", finding)
 			}
 		})
 	}
@@ -147,7 +182,11 @@ func goListLines(t *testing.T, args ...string) []string {
 func goListOutput(t *testing.T, args ...string) string {
 	t.Helper()
 
-	out, err := exec.Command("go", append([]string{"list"}, args...)...).Output()
+	command := exec.Command("go", append([]string{"list"}, args...)...)
+	// Module resolution is read-only and offline: the gate must not download
+	// dependencies, install tools or touch go.mod/go.sum.
+	command.Env = append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=readonly")
+	out, err := command.Output()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
