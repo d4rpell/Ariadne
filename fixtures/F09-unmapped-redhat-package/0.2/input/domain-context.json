@@ -1,0 +1,10 @@
+{
+  "maximum_evidence_age_seconds": 2592000,
+  "source_pins": [
+    {
+      "role": "artifact",
+      "source": "inspection.json",
+      "source_hash": "sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f"
+    }
+  ]
+}

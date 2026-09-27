@@ -1,0 +1,24 @@
+{
+  "records": {
+    "artifact": [
+      {
+        "architecture": "amd64",
+        "artifact_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "component_id": "openssl",
+        "coverage": "complete",
+        "digest_kind": "platform_manifest",
+        "epoch": "1",
+        "method": "artifact-package-inspection-v1",
+        "os": "linux",
+        "package_arch": "x86_64",
+        "package_name": "openssl",
+        "package_release": "1.el9",
+        "product_id": "rhel",
+        "product_release": "9",
+        "vendor": "redhat",
+        "version": "3.0.0"
+      }
+    ]
+  },
+  "transcription": "synthetic package inspection transcript"
+}

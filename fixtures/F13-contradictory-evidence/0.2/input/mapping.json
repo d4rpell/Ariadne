@@ -1,0 +1,23 @@
+{
+  "records": {
+    "mapping": [
+      {
+        "architecture": "amd64",
+        "component_id": "openssl",
+        "coverage": "complete",
+        "method": "product-component-map-v1",
+        "os": "linux",
+        "package_arch": "x86_64",
+        "package_name": "openssl",
+        "product_id": "rhel",
+        "product_release": "9",
+        "scanner_package_id": "pkg-1",
+        "scanner_package_name": "openssl",
+        "scanner_package_type": "rpm",
+        "vendor": "redhat",
+        "vulnerability_id": "CVE-2026-9003"
+      }
+    ]
+  },
+  "transcription": "synthetic product-to-component mapping transcript"
+}

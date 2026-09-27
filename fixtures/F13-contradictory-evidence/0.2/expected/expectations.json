@@ -1,0 +1,65 @@
+{
+  "profile": "product-evidence-v1",
+  "product_status": "under_investigation",
+  "exploitability": "not_assessed",
+  "reasons": [
+    "affirmative_conflict",
+    "blocking_warning",
+    "conflicting_evidence"
+  ],
+  "candidates": [
+    {
+      "rule_id": "rule.affected",
+      "product_status": "affected"
+    },
+    {
+      "rule_id": "rule.fixed",
+      "product_status": "fixed"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "rule.affected",
+      "state": "checked",
+      "missing_requirements": [],
+      "checks": [
+        {
+          "check_id": "check.terminal",
+          "outcome": "pass",
+          "reasons": [
+            "verified"
+          ]
+        }
+      ]
+    },
+    {
+      "rule_id": "rule.fixed",
+      "state": "checked",
+      "missing_requirements": [],
+      "checks": [
+        {
+          "check_id": "check.terminal",
+          "outcome": "pass",
+          "reasons": [
+            "verified"
+          ]
+        }
+      ]
+    },
+    {
+      "rule_id": "rule.shortcut",
+      "state": "checked",
+      "missing_requirements": [],
+      "checks": [
+        {
+          "check_id": "check.finding",
+          "outcome": "pass",
+          "reasons": [
+            "verified"
+          ]
+        }
+      ]
+    }
+  ],
+  "warning_references": 2
+}

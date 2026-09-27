@@ -1,0 +1,42 @@
+{
+  "definitions": [
+    {
+      "support": {
+        "basis_id": "basis.cve-2026-9002",
+        "vulnerability_id": "CVE-2026-9002"
+      },
+      "vulnerability_id": "CVE-2026-9002"
+    }
+  ],
+  "records": {
+    "proof": [
+      {
+        "advisory_id": "RHSA-2026:0003",
+        "advisory_revision": "1",
+        "architecture": "amd64",
+        "basis_id": "basis.cve-2026-9002",
+        "basis_locator": "definitions/0/support",
+        "component_id": "openssl",
+        "coverage": "complete",
+        "epoch": "1",
+        "fix_id": "fix.9002",
+        "fix_membership": "included_in_exact_build",
+        "fixed_code_id": "code.fixed.9002",
+        "method": "vendor-exact-build-proof-v1",
+        "os": "linux",
+        "package_arch": "x86_64",
+        "package_name": "openssl",
+        "package_release": "1.el9",
+        "product_id": "rhel",
+        "product_release": "9",
+        "proof_kind": "fixed_build",
+        "source_status_value": "vendor-declared-status",
+        "source_status_vocabulary": "redhat-severity-free",
+        "vendor": "redhat",
+        "version": "1.2.3",
+        "vulnerability_id": "CVE-2026-9002"
+      }
+    ]
+  },
+  "transcription": "synthetic vendor advisory transcript"
+}

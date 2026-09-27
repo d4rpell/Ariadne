@@ -1,0 +1,6 @@
+{
+  "evaluated_at": "2026-10-01T12:00:00Z",
+  "expected_pack_hash": "sha256:38619f71a52d0a7a1723cee46bfbef5a73fcccbb68e7ecc39323a9bde67e7616",
+  "expected_pack_id": "pack.fixtures",
+  "minimum_version": 1
+}

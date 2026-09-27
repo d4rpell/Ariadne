@@ -1,0 +1,29 @@
+{
+  "profile": "product-evidence-v1",
+  "product_status": "fixed",
+  "exploitability": "not_assessed",
+  "reasons": [],
+  "candidates": [
+    {
+      "rule_id": "rule.fixed",
+      "product_status": "fixed"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "rule.fixed",
+      "state": "checked",
+      "missing_requirements": [],
+      "checks": [
+        {
+          "check_id": "check.terminal",
+          "outcome": "pass",
+          "reasons": [
+            "verified"
+          ]
+        }
+      ]
+    }
+  ],
+  "warning_references": 0
+}

@@ -1,0 +1,23 @@
+{
+  "profile": "product-evidence-v1",
+  "product_status": "under_investigation",
+  "exploitability": "not_assessed",
+  "reasons": [
+    "domain_source_unapproved",
+    "requirements_missing"
+  ],
+  "candidates": [],
+  "rules": [
+    {
+      "rule_id": "rule.affected",
+      "state": "missing_evidence",
+      "missing_requirements": [
+        "domain.artifact",
+        "domain.mapping",
+        "domain.vendor_proof"
+      ],
+      "checks": []
+    }
+  ],
+  "warning_references": 0
+}

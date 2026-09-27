@@ -1,0 +1,27 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "pod-F13",
+        "namespace": "fixtures",
+        "uid": "uid-F13"
+      },
+      "status": {
+        "containerStatuses": [
+          {
+            "imageID": "reg.example/app@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "name": "app",
+            "platform": {
+              "architecture": "amd64",
+              "os": "linux"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "kind": "List"
+}

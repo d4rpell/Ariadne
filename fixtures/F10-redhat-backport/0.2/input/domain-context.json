@@ -1,0 +1,22 @@
+{
+  "maximum_evidence_age_seconds": 2592000,
+  "source_pins": [
+    {
+      "role": "mapping",
+      "source": "mapping.json",
+      "source_hash": "sha256:b09c488b8d6d1572f5e4b65af1f92a692ffe2bcda4c82682353ecc3cc9762f78"
+    },
+    {
+      "role": "artifact",
+      "source": "inspection.json",
+      "source_hash": "sha256:04876466aa93669af148d3a5ccf2bc349b0c22ae9d0c86e6bdf550182517459a"
+    },
+    {
+      "advisory_id": "RHSA-2026:0003",
+      "advisory_revision": "1",
+      "role": "vendor",
+      "source": "advisory.json",
+      "source_hash": "sha256:58fddbb4d890e3ea40ba507fd2c848c70eef2b9c6372d634587d6a36aaa53a0e"
+    }
+  ]
+}
