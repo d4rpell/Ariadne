@@ -182,16 +182,34 @@ func checkInputLimits(request Request) error {
 	if total > MaxTargetTotalBytes {
 		return problem(CodeInputLimit, -1)
 	}
-	// The admission-context budget is dominated by the declared domains: a pinned
-	// id is at most 64 bytes and both hashes are exactly 71 bytes, well below the
-	// 4 KiB total. The sum is still computed so a future domain cannot silently
-	// exceed the limit.
+	// The joint context budget of ADR-0015 §7.3 counts the typed strings of the
+	// admission context and of the domain context together, every occurrence
+	// included; null contributes zero. Each addition is compared against the
+	// remaining room first, so the sum cannot overflow.
 	contextBytes := len(request.Admission.ExpectedPackID) + len(request.Admission.ExpectedPackHash)
 	if previous := request.Admission.Previous; previous != nil {
 		contextBytes += len(previous.Hash)
 	}
 	if contextBytes > MaxContextTotalBytes {
 		return problem(CodeInputLimit, -1)
+	}
+	if domain := request.Domain; domain != nil {
+		// The cardinality is checked before any pin is walked, so an oversized
+		// collection cannot cost work before its own limit applies (ADR-0018 §4.1).
+		if len(domain.SourcePins) > MaxSourcePins {
+			return problem(CodeInputLimit, -1)
+		}
+		for _, pin := range domain.SourcePins {
+			for _, value := range []string{
+				string(pin.Role), pin.Source, string(pin.SourceHash),
+				optionalValue(pin.AdvisoryID), optionalValue(pin.AdvisoryRevision),
+			} {
+				if len(value) > MaxContextTotalBytes-contextBytes {
+					return problem(CodeInputLimit, -1)
+				}
+				contextBytes += len(value)
+			}
+		}
 	}
 	return checkBundleLimits(request.Bundle)
 }
@@ -502,19 +520,8 @@ func canonicalCopy(bundle contract.Bundle) (contract.Bundle, error) {
 }
 
 // checkValueHashes revalidates the value hash of every recognised fact that
-// carries a value. A present value whose hash does not match is an integrity
-// rejection, never unknown evidence that could still be used.
-func checkValueHashes(bundle contract.Bundle) error {
-	for index, item := range bundle.Evidence {
-		if item.Value == nil || !recognizedType(item.Type) {
-			continue
-		}
-		if item.ValueHash == nil || string(*item.ValueHash) != hashValue(*item.Value) {
-			return problem(CodeValueHashMismatch, index)
-		}
-	}
-	return nil
-}
+// carries a value. The domain types are handled in domain_admission.go, where
+// the strict profile classification decides whether they are verified.
 
 // requirementOutcome is the resolution of one requirement: whether the bundle
 // substantiates it, the reasons when it does not, the canonical references it

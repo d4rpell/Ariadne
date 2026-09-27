@@ -11,11 +11,16 @@ import (
 // cannot multiply work by repeating requirements.
 type factSet struct {
 	resolver *resolver
+	domain   *domainAssessment
 	resolved map[rulepack.Requirement]requirementOutcome
 }
 
-func newFactSet(resolver *resolver) *factSet {
-	return &factSet{resolver: resolver, resolved: make(map[rulepack.Requirement]requirementOutcome)}
+func newFactSet(resolver *resolver, domain *domainAssessment) *factSet {
+	return &factSet{
+		resolver: resolver,
+		domain:   domain,
+		resolved: make(map[rulepack.Requirement]requirementOutcome),
+	}
 }
 
 // storeCheckReferences admits the occurrence one check trace stores. A repeated
@@ -32,7 +37,14 @@ func (facts *factSet) resolve(requirement rulepack.Requirement) requirementOutco
 	if outcome, ok := facts.resolved[requirement]; ok {
 		return outcome
 	}
-	outcome := facts.resolver.outcome(requirement)
+	var outcome requirementOutcome
+	switch requirement {
+	case rulepack.RequirementDomainMapping, rulepack.RequirementDomainArtifact,
+		rulepack.RequirementDomainVendorProof, rulepack.RequirementDomainCurrent:
+		outcome = domainRequirementOutcome(requirement, facts.domain, facts.resolver)
+	default:
+		outcome = facts.resolver.outcome(requirement)
+	}
 	facts.resolved[requirement] = outcome
 	return outcome
 }
@@ -40,13 +52,26 @@ func (facts *factSet) resolve(requirement rulepack.Requirement) requirementOutco
 // Evaluate is the whole engine: limits, request form, bundle integrity, pack
 // admission, ruleset linkage, work budget and rule execution. A returned error
 // rejects the evaluation and the result is the zero value, never a partial one.
+//
+// The phases are the ratified order of ADR-0018 §4 and ADR-0015 §7.3: limits;
+// context and target form; bundle validity, projection hash and value integrity;
+// pack presence and hash; pack syntax, schema and profile (vocabulary first, then
+// the profile/version cross); identity and anti-downgrade; validity; ruleset
+// linkage; work budget and result.
 func Evaluate(request Request) (Result, error) {
-	// 1. Limits of every input.
+	// 1. Limits of every input, context included whether or not a profile will
+	// end up requiring it.
 	if err := checkInputLimits(request); err != nil {
 		return Result{}, err
 	}
 	// 2. Form of the caller-supplied context and target, before any bundle
-	// interpretation.
+	// interpretation. The profile is recognized strictly and without admission,
+	// because the context contract depends on it and the context phase precedes
+	// pack admission (ADR-0018 §3/§4).
+	recognition := rulepack.RecognizeProfile(request.PackBytes)
+	if err := checkContextForm(request, recognition); err != nil {
+		return Result{}, err
+	}
 	if err := request.Admission.Validate(); err != nil {
 		return Result{}, err
 	}
@@ -68,14 +93,19 @@ func Evaluate(request Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := checkValueHashes(canonicalBundle); err != nil {
+	// Domain value integrity belongs to the bundle phase: the classification
+	// decides which types are verified, and the pack is not admitted yet.
+	if err := checkValueHashes(canonicalBundle, recognition); err != nil {
 		return Result{}, err
 	}
-	// 4. Pack admission: presence, bytes, schema, identity, version and validity.
-	admitted, err := rulepack.Admit(request.PackBytes, request.Admission)
+	// 4. Pack admission: presence, bytes, schema, identity, version and validity,
+	// plus the profile/version cross inside the schema phase.
+	admitted, err := rulepack.AdmitForBundle(request.PackBytes, request.Admission, canonicalBundle.SchemaVersion)
 	if err != nil {
 		return Result{}, err
 	}
+	pack := admitted.Pack()
+	product := pack.Profile == rulepack.ProductEvidenceProfile
 	// 5. Ruleset linkage: a bundle may name a ruleset, and then it must name the
 	// admitted pack. Its path and version are inert references.
 	if ruleset := canonicalBundle.Provenance.Ruleset; ruleset != (contract.RulesetRef{}) {
@@ -84,10 +114,15 @@ func Evaluate(request Request) (Result, error) {
 		}
 	}
 
-	pack := admitted.Pack()
 	budget := &referenceBudget{}
 	resolver := newResolver(canonicalBundle, request.Target, request.Admission.EvaluatedAt.Time, budget)
-	facts := newFactSet(resolver)
+
+	var domain domainAssessment
+	if product {
+		domain = assessDomain(resolver, *request.Domain)
+	}
+
+	facts := newFactSet(resolver, &domain)
 
 	rules := sortedRules(pack.Rules)
 	matched := 0
@@ -105,6 +140,10 @@ func Evaluate(request Request) (Result, error) {
 				candidates += facts.resolve(requirement).candidates
 			}
 		}
+	}
+	// The global inspection is work too, even when no rule is applicable.
+	if product {
+		candidates += len(domain.globalRefs)
 	}
 	// 6. Work budget, computed before any check executes and independent of the
 	// host or of the input order.
@@ -127,10 +166,12 @@ func Evaluate(request Request) (Result, error) {
 	}
 
 	traces := make([]RuleTrace, 0, len(rules))
+	affirmativeCandidates := make([]Candidate, 0)
 	conflict := false
 	requirementsMissing := false
 	checksFailed := false
 	checksUnknown := false
+	affirmativeUncertain := false
 	for _, rule := range rules {
 		trace, err := traceRule(rule, canonicalBundle.Provenance.Coverage.Method, request.Target.VulnerabilityID, facts)
 		if err != nil {
@@ -140,17 +181,38 @@ func Evaluate(request Request) (Result, error) {
 			return Result{}, problem(CodeEvaluationLimit, -1)
 		}
 		traces = append(traces, trace)
+		affirmative := product && rule.Emit != rulepack.OutputUnderInvestigation
 		switch trace.State {
 		case RuleMissingEvidence:
 			requirementsMissing = true
+			if affirmative {
+				affirmativeUncertain = true
+			}
 		case RuleChecked:
+			allPass := len(trace.Checks) > 0
 			for _, check := range trace.Checks {
 				switch check.Outcome {
 				case OutcomeFail:
 					checksFailed = true
+					allPass = false
 				case OutcomeUnknown:
 					checksUnknown = true
+					allPass = false
+					if affirmative {
+						affirmativeUncertain = true
+					}
 				}
+			}
+			if affirmative && allPass {
+				candidate := Candidate{
+					RuleID:             rule.RuleID,
+					ProductStatus:      contract.ProductStatus(rule.Emit),
+					EvidenceReferences: append([]EvidenceReference{}, trace.EvidenceReferences...),
+				}
+				if !budget.admit(len(candidate.EvidenceReferences)) {
+					return Result{}, problem(CodeEvaluationLimit, -1)
+				}
+				affirmativeCandidates = append(affirmativeCandidates, candidate)
 			}
 		}
 		for _, reason := range trace.Reasons {
@@ -167,6 +229,16 @@ func Evaluate(request Request) (Result, error) {
 	if budget.over {
 		return Result{}, problem(CodeEvaluationLimit, -1)
 	}
+	// The global domain inspection is part of the result whether or not a rule
+	// selected it: a pack cannot hide the records it chose not to evaluate by
+	// declaring no applicable rule. Every occurrence is charged to the budget.
+	if product {
+		if !budget.admit(len(domain.globalRefs)) {
+			return Result{}, problem(CodeEvaluationLimit, -1)
+		}
+		evidenceReferences = append(evidenceReferences, domain.globalRefs...)
+		sortReferencesInPlace(evidenceReferences)
+	}
 
 	// The admission context is copied, including its pointer member, so a caller
 	// cannot rewrite a returned result through its own state.
@@ -176,32 +248,66 @@ func Evaluate(request Request) (Result, error) {
 		admission.Previous = &copied
 	}
 
-	reasons := globalReasons(globalState{
-		noApplicableRule: matched == 0,
-		// A target is substantiated only when both its row and its image are
-		// accredited: half a target is a visible gap, not a silent one.
-		targetUnsubstantiated: !rowOutcome.satisfied || !imageOutcome.satisfied,
-		incompleteEvidence:    !completeOutcome.satisfied,
-		blockingWarning:       blocking,
-		conflicting:           conflict,
-		requirementsMissing:   requirementsMissing,
-		checksFailed:          checksFailed,
-		checksUnknown:         checksUnknown,
-	})
+	var domainPointer *DomainContext
+	if product {
+		copied := copyDomainContext(*request.Domain)
+		copied.SourcePins = sortedDomainPins(copied.SourcePins)
+		domainPointer = &copied
+	}
+
+	status := contract.ProductUnderInvestigation
+	exploitability := contract.ExploitabilityNotAssessed
+	var reasons []Reason
+
+	if product {
+		globalDomain := domain.globalDomainReasons()
+		for _, reason := range globalDomain {
+			if reason == ReasonAffirmativeConflict {
+				conflict = true
+			}
+		}
+		status, reasons = resolveProductStatus(productResolution{
+			candidates:            affirmativeCandidates,
+			domain:                domain,
+			affirmativeUncertain:  affirmativeUncertain,
+			blocking:              blocking,
+			conflict:              conflict,
+			requirementsMissing:   requirementsMissing,
+			checksFailed:          checksFailed,
+			checksUnknown:         checksUnknown,
+			noApplicableRule:      matched == 0,
+			targetUnsubstantiated: !rowOutcome.satisfied || !imageOutcome.satisfied,
+			incompleteEvidence:    !completeOutcome.satisfied,
+			globalDomain:          globalDomain,
+		})
+	} else {
+		reasons = globalReasons(globalState{
+			noApplicableRule:      matched == 0,
+			targetUnsubstantiated: !rowOutcome.satisfied || !imageOutcome.satisfied,
+			incompleteEvidence:    !completeOutcome.satisfied,
+			blockingWarning:       blocking,
+			conflicting:           conflict,
+			requirementsMissing:   requirementsMissing,
+			checksFailed:          checksFailed,
+			checksUnknown:         checksUnknown,
+		})
+	}
 
 	return Result{
 		EngineVersion:      EngineVersion,
-		ProfileVersion:     ProfileVersion,
+		ProfileVersion:     pack.Profile,
 		BundleHash:         bundleHash,
 		PackID:             admitted.PackID(),
 		PackVersion:        admitted.Version(),
 		PackHash:           admitted.Hash(),
 		Target:             request.Target,
 		Admission:          admission,
-		ProductStatus:      contract.ProductUnderInvestigation,
-		Exploitability:     contract.ExploitabilityNotAssessed,
+		Domain:             domainPointer,
+		ProductStatus:      status,
+		Exploitability:     exploitability,
 		Reasons:            reasons,
 		Rules:              traces,
+		Candidates:         affirmativeCandidates,
 		EvidenceReferences: evidenceReferences,
 		WarningReferences:  warningReferences,
 	}, nil

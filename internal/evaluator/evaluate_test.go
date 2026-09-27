@@ -101,11 +101,14 @@ func TestEvaluationIgnoresOperationalMetadata(t *testing.T) {
 	})
 }
 
-// referenceCount is the budget the result must respect: warning references and
-// every repetition of an evidence reference across traces, counted the same way
-// the engine counts them.
+// referenceCount is the budget the result must respect: warning references,
+// candidate references and every repetition of an evidence reference across
+// traces, counted the same way the engine counts them.
 func referenceCount(result Result) int {
 	total := len(result.WarningReferences) + len(result.EvidenceReferences)
+	for _, candidate := range result.Candidates {
+		total += len(candidate.EvidenceReferences)
+	}
 	for _, trace := range result.Rules {
 		total += len(trace.EvidenceReferences)
 		for _, check := range trace.Checks {
@@ -453,7 +456,7 @@ func TestEvaluationLimits(t *testing.T) {
 		}
 
 		resolver := newResolver(bundle, request.Target, evaluatedAt, exhausted)
-		facts := newFactSet(resolver)
+		facts := newFactSet(resolver, &domainAssessment{})
 		outcome := facts.resolve(rulepack.RequirementFindingRow)
 		if len(outcome.refs) == 0 {
 			t.Fatalf("the fixture must substantiate the row requirement")
@@ -640,46 +643,69 @@ func TestEvaluationLimits(t *testing.T) {
 
 	t.Run("candidate budget boundary", func(t *testing.T) {
 		// A matched rule queries the complete record (1), the row (1) and the image
-		// group twice, because its check reads it again. With five rules and a scope
-		// group of 99.999 candidates the total is 5 × (2 + 2×99.999) = 1.000.000
-		// exactly, so the budget is inclusive and the first reachable excess is
-		// rejected. The fixture contributes eleven scope items and one image.
-		scopeItems := 99987
-		grow := func(bundle *contract.Bundle, extra int) {
-			item := fillerItem(bundle)
-			item.Scope.ContainerName = containerA
-			item.Locator = contract.SourceLocator("record/99/bytes/0-40")
-			for index := 0; index < scopeItems+extra; index++ {
-				bundle.Evidence = append(bundle.Evidence, item)
+		// group twice, because its check reads it again. The scope group is sized
+		// so that five rules land on the budget exactly: the calibration counts the
+		// scope items the fixture already carries instead of hardcoding them, so
+		// adding a fact to the control cannot silently move the boundary. The
+		// budget is inclusive and the first reachable excess is rejected.
+		scopeCarried := 0
+		for _, item := range request.Bundle.Evidence {
+			if item.Scope.SubjectUID == request.Target.SubjectUID && item.Scope.ContainerName == containerA {
+				scopeCarried++
 			}
 		}
-		rules := []string{}
-		for index := 0; index < 5; index++ {
-			rules = append(rules, ruleJSON("rule."+strconv.Itoa(index), cveA,
-				`{"check_id":"check.`+strconv.Itoa(index)+`","predicate":"image_digest_bound","params":{}}`,
-				`"bundle.complete","finding.row","image.bound_digest"`))
+		if len(request.Bundle.Images) != 1 {
+			t.Fatalf("the fixture must carry one image, found %d", len(request.Bundle.Images))
 		}
-		joined := strings.Join(rules, ",")
-
-		atLimit := packWith(t, mutateRequest(t, request, func(bundle *contract.Bundle) { grow(bundle, 0) }), joined)
-		if _, err := Evaluate(atLimit); err != nil {
-			t.Fatalf("exactly the candidate budget must be admitted: %v", err)
+		// per rule: complete (1) + row (1) + the image group read twice (the
+		// requirement and the check), each read charging the scope items plus the
+		// image identity, so five rules cost 5 × (2 + 2×(scope + images)).
+		const rules = 5
+		images := len(request.Bundle.Images)
+		base := 2 + 2*images
+		scopeTotal := (MaxCandidateBudget/rules - base) / 2
+		if charged := rules * (base + 2*scopeTotal); charged != MaxCandidateBudget {
+			t.Fatalf("the calibration is not exact: the boundary would sit at %d", charged)
 		}
-		// The first reachable excess is one candidate, not ten: adding one
-		// requirement to one rule queries the single row item once more.
-		withExtra := []string{}
-		for index := 0; index < 5; index++ {
-			requires := `"bundle.complete","finding.row","image.bound_digest"`
-			if index == 4 {
-				requires = `"bundle.complete","finding.row","image.bound_digest","finding.fix_status"`
-			}
-			withExtra = append(withExtra, ruleJSON("rule."+strconv.Itoa(index), cveA,
-				`{"check_id":"check.`+strconv.Itoa(index)+`","predicate":"image_digest_bound","params":{}}`,
-				requires))
-		}
-		over := packWith(t, mutateRequest(t, request, func(bundle *contract.Bundle) { grow(bundle, 0) }), strings.Join(withExtra, ","))
-		if _, err := Evaluate(over); !IsCode(err, CodeEvaluationLimit) {
-			t.Fatalf("expected evaluation_limit at 1.000.001 candidates, got %v", err)
+		for _, testCase := range []struct {
+			name    string
+			scope   int
+			wantErr bool
+		}{
+			{name: "exactly at the budget", scope: scopeTotal, wantErr: false},
+			{name: "over the budget", scope: scopeTotal + 1, wantErr: true},
+		} {
+			t.Run(testCase.name, func(t *testing.T) {
+				target := testCase.scope - scopeCarried
+				if target < 0 {
+					t.Fatalf("the fixture already exceeds the target scope: %d > %d", scopeCarried, testCase.scope)
+				}
+				grow := func(bundle *contract.Bundle) {
+					item := fillerItem(bundle)
+					item.Scope.ContainerName = containerA
+					item.Locator = contract.SourceLocator("record/99/bytes/0-40")
+					for index := 0; index < target; index++ {
+						bundle.Evidence = append(bundle.Evidence, item)
+					}
+				}
+				rules := []string{}
+				for index := 0; index < 5; index++ {
+					rules = append(rules, ruleJSON("rule."+strconv.Itoa(index), cveA,
+						`{"check_id":"check.`+strconv.Itoa(index)+`","predicate":"image_digest_bound","params":{}}`,
+						`"bundle.complete","finding.row","image.bound_digest"`))
+				}
+				grown := packWith(t, mutateRequest(t, request, func(bundle *contract.Bundle) { grow(bundle) }), strings.Join(rules, ","))
+				_, err := Evaluate(grown)
+				if testCase.wantErr {
+					if !IsCode(err, CodeEvaluationLimit) {
+						t.Fatalf("expected evaluation_limit at the first excess, got %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("exactly the candidate budget must be admitted: %v", err)
+				}
+			})
 		}
 	})
 

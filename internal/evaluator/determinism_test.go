@@ -25,12 +25,35 @@ type resultDTO struct {
 	PackHash           string          `json:"pack_hash"`
 	Target             targetDTO       `json:"target"`
 	Admission          admissionDTO    `json:"admission"`
+	Domain             *domainDTO      `json:"domain"`
 	ProductStatus      string          `json:"product_status"`
 	Exploitability     string          `json:"exploitability"`
 	Reasons            []string        `json:"reasons"`
 	Rules              []ruleTraceDTO  `json:"rules"`
+	Candidates         []candidateDTO  `json:"candidates"`
 	EvidenceReferences []int           `json:"evidence_references"`
 	WarningReferences  []warningRefDTO `json:"warning_references"`
+}
+
+// domainDTO covers every leaf of DomainContext and every pin field, including
+// the explicit nulls of the advisory pair.
+type domainDTO struct {
+	MaximumEvidenceAgeSeconds int64    `json:"maximum_evidence_age_seconds"`
+	SourcePins                []pinDTO `json:"source_pins"`
+}
+
+type pinDTO struct {
+	Role             string  `json:"role"`
+	Source           string  `json:"source"`
+	SourceHash       string  `json:"source_hash"`
+	AdvisoryID       *string `json:"advisory_id"`
+	AdvisoryRevision *string `json:"advisory_revision"`
+}
+
+type candidateDTO struct {
+	RuleID             string `json:"rule_id"`
+	ProductStatus      string `json:"product_status"`
+	EvidenceReferences []int  `json:"evidence_references"`
 }
 
 type targetDTO struct {
@@ -100,10 +123,12 @@ func dtoFromResult(result Result) resultDTO {
 			ExpectedPackHash: result.Admission.ExpectedPackHash,
 			MinimumVersion:   result.Admission.MinimumVersion,
 		},
+		Domain:             domainFromResult(result.Domain),
 		ProductStatus:      string(result.ProductStatus),
 		Exploitability:     string(result.Exploitability),
 		Reasons:            globalReasonStrings(result.Reasons),
 		Rules:              make([]ruleTraceDTO, 0, len(result.Rules)),
+		Candidates:         make([]candidateDTO, 0, len(result.Candidates)),
 		EvidenceReferences: referenceIndices(result.EvidenceReferences),
 		WarningReferences:  make([]warningRefDTO, 0, len(result.WarningReferences)),
 	}
@@ -134,11 +159,40 @@ func dtoFromResult(result Result) resultDTO {
 		}
 		dto.Rules = append(dto.Rules, rule)
 	}
+	for _, candidate := range result.Candidates {
+		dto.Candidates = append(dto.Candidates, candidateDTO{
+			RuleID:             candidate.RuleID,
+			ProductStatus:      string(candidate.ProductStatus),
+			EvidenceReferences: referenceIndices(candidate.EvidenceReferences),
+		})
+	}
 	for _, reference := range result.WarningReferences {
 		dto.WarningReferences = append(dto.WarningReferences, warningRefDTO{
 			Origin:        string(reference.Origin),
 			EvidenceIndex: reference.EvidenceIndex,
 			WarningIndex:  reference.WarningIndex,
+		})
+	}
+	return dto
+}
+
+// domainFromResult encodes the domain context leaf by leaf; a nil context stays
+// a JSON null, which is the legacy absence and not a zero TTL.
+func domainFromResult(context *DomainContext) *domainDTO {
+	if context == nil {
+		return nil
+	}
+	dto := &domainDTO{
+		MaximumEvidenceAgeSeconds: context.MaximumEvidenceAgeSeconds,
+		SourcePins:                make([]pinDTO, 0, len(context.SourcePins)),
+	}
+	for _, pin := range context.SourcePins {
+		dto.SourcePins = append(dto.SourcePins, pinDTO{
+			Role:             string(pin.Role),
+			Source:           pin.Source,
+			SourceHash:       string(pin.SourceHash),
+			AdvisoryID:       copyPointer(pin.AdvisoryID),
+			AdvisoryRevision: copyPointer(pin.AdvisoryRevision),
 		})
 	}
 	return dto
@@ -183,8 +237,8 @@ func encodeResultDTO(t *testing.T, result Result) []byte {
 func TestResultTestEncodingCoverage(t *testing.T) {
 	declared := []string{
 		"EngineVersion", "ProfileVersion", "BundleHash", "PackID", "PackVersion", "PackHash",
-		"Target", "Admission", "ProductStatus", "Exploitability", "Reasons", "Rules",
-		"EvidenceReferences", "WarningReferences",
+		"Target", "Admission", "Domain", "ProductStatus", "Exploitability", "Reasons", "Rules",
+		"Candidates", "EvidenceReferences", "WarningReferences",
 	}
 	resultType := reflect.TypeOf(Result{})
 	if resultType.NumField() != len(declared) {

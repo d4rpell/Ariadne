@@ -15,6 +15,36 @@ func checkRequirements(check rulepack.Check) []rulepack.Requirement {
 		return []rulepack.Requirement{rulepack.RequirementImageBoundDigest}
 	case rulepack.PredicateImagePlatformKnown:
 		return []rulepack.Requirement{rulepack.RequirementImageBoundDigest, rulepack.RequirementImageKnownPlatform}
+	case rulepack.PredicateRedhatProductMapped:
+		return []rulepack.Requirement{
+			rulepack.FindingRequirement(rulepack.FieldPackageType),
+			rulepack.FindingRequirement(rulepack.FieldPackageName),
+			rulepack.FindingRequirement(rulepack.FieldPackageID),
+			rulepack.RequirementDomainMapping,
+		}
+	case rulepack.PredicateRedhatArtifactBound:
+		return []rulepack.Requirement{
+			rulepack.FindingRequirement(rulepack.FieldPackageType),
+			rulepack.FindingRequirement(rulepack.FieldPackageName),
+			rulepack.FindingRequirement(rulepack.FieldPackageID),
+			rulepack.RequirementImageBoundDigest,
+			rulepack.RequirementImageKnownPlatform,
+			rulepack.RequirementDomainMapping,
+			rulepack.RequirementDomainArtifact,
+		}
+	case rulepack.PredicateRedhatBuildAffected, rulepack.PredicateRedhatBuildFixed,
+		rulepack.PredicateRedhatCodeExcluded:
+		return []rulepack.Requirement{
+			rulepack.FindingRequirement(rulepack.FieldPackageType),
+			rulepack.FindingRequirement(rulepack.FieldPackageName),
+			rulepack.FindingRequirement(rulepack.FieldPackageID),
+			rulepack.RequirementImageBoundDigest,
+			rulepack.RequirementImageKnownPlatform,
+			rulepack.RequirementDomainMapping,
+			rulepack.RequirementDomainArtifact,
+			rulepack.RequirementDomainVendorProof,
+			rulepack.RequirementDomainCurrent,
+		}
 	}
 	return nil
 }
@@ -22,8 +52,15 @@ func checkRequirements(check rulepack.Check) []rulepack.Requirement {
 // runCheck executes one closed predicate over requirements that are already
 // resolved and satisfied. A check never discovers evidence of its own: it reads
 // an outcome and compares values. Outcomes are pass, fail or unknown, and a
-// failing or unknown check never leaves the initial profile.
+// failing or unknown check never leaves the initial profile. The five domain
+// predicates are dispatched to their own module.
 func runCheck(check rulepack.Check, facts *factSet) CheckTrace {
+	switch check.Predicate {
+	case rulepack.PredicateRedhatProductMapped, rulepack.PredicateRedhatArtifactBound,
+		rulepack.PredicateRedhatBuildAffected, rulepack.PredicateRedhatBuildFixed,
+		rulepack.PredicateRedhatCodeExcluded:
+		return runDomainCheck(check, facts, facts.domain)
+	}
 	trace := CheckTrace{
 		CheckID:            check.CheckID,
 		Reasons:            []CheckReason{},

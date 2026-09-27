@@ -98,6 +98,7 @@ func declaredRow(t *testing.T, subject contract.Subject, container contract.Cont
 		make("prisma_v1.fix_status", "fixed", contract.ProvenanceObserved),
 		make("prisma_v1.package_type", "rpm", contract.ProvenanceObserved),
 		make("prisma_v1.package_id", "pkg-1", contract.ProvenanceObserved),
+		make("prisma_v1.severity", "high", contract.ProvenanceObserved),
 		make(TypeRequestedImage, requestedA, contract.ProvenanceDerived),
 	}
 }
@@ -140,7 +141,7 @@ func baseBundle(t *testing.T) contract.Bundle {
 		ObservedAt:       stampPointer(mustStamp(t, statusObservedAt)),
 	}
 	bundle := contract.Bundle{
-		SchemaVersion:            contract.SchemaVersionSupported,
+		SchemaVersion:            "0.1",
 		Subject:                  subject,
 		Images:                   []contract.ImageIdentity{image},
 		ObservedContainerClasses: []contract.ContainerClass{},
