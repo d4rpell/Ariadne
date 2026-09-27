@@ -9,9 +9,10 @@ may be inferred from the package name or from a version string.
 
 - `input/bundle.json`: canonical Bundle `0.2` envelope of a complete findings
   import for one synthetic subject (`uid-F09`, container `app`), with the
-  declared finding row, the container observation (image id, normalized digest,
-  platform) and an artifact inspection group. There is no `domain.mapping`
-  group and no vendor proof.
+  complete declared finding row (the fifteen columns of the canonical record
+  plus the composed `requested_image`), the container observation (image id,
+  normalized digest, platform) and an artifact inspection group. There is no
+  `domain.mapping` group and no vendor proof.
 - `input/findings.csv`, `input/pods.json`, `input/inspection.json`: complete
   synthetic transcriptions of the sources the bundle references by SHA-256.
   Each transcription carries the facts attributed to it: the CSV is one
@@ -20,13 +21,15 @@ may be inferred from the package name or from a version string.
   `items[0].status.containerStatuses[0]` carries the observed image id and
   platform, and `inspection.json` is the package inspection record. Every
   evidence item is contrasted with the exact field of the record its locator
-  resolves to: a CSV locator is the absolute byte interval of the record in the
-  stream (ADR-0008) and a JSON locator resolves to the record that must state
-  the value. `TestProductFixtures` fails if a source is replaced or if a fact is
-  attributed to a record that does not state it: the file digest, the item
-  `source_hash` and the resolved field are all checked. The bundle is
-  the only machine-consumed authority; the transcriptions exist so the hashes
-  are reproducible and the facts auditable.
+  names: a CSV locator is the absolute byte interval of the record in the stream
+  (ADR-0008), a JSON locator must be the carrier the item type declares, and a
+  proof's `basis_locator` must resolve to a support definition that agrees on the
+  basis and the vulnerability. `TestProductFixtures` fails if a source is
+  replaced, if a fact is attributed to a record that does not state it or if a
+  `value_hash` does not cover the value the record states: the file digest, the
+  item `source_hash`, the resolved field and the hash preimage are all checked.
+  The bundle is the only machine-consumed authority; the transcriptions exist so
+  the hashes are reproducible and the facts auditable.
 - `input/pack.json`: declarative pack, schema `0.1`, profile
   `product-evidence-v1`, one affirmative rule `rule.affected` with the eleven
   minimum requirements and the `redhat_build_affected` terminal.

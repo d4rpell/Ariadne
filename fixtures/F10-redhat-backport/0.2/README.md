@@ -9,10 +9,11 @@ vendor proof bound to the observed build may conclude `fixed`.
 
 - `input/bundle.json`: canonical Bundle `0.2` envelope of a complete findings
   import for one synthetic subject (`uid-F10`, container `app`), with the
-  declared finding row (installed version `1.2.3-1`, severity `low`), the
-  container observation, the mapping group, the artifact inspection group
-  (version `1.2.3`) and one exact `fixed_build` vendor proof bound to the
-  observed digest.
+  complete declared finding row (the fifteen columns of the canonical record —
+  installed version `1.2.3-1`, severity `low` — plus the composed
+  `requested_image`), the container observation, the mapping group, the artifact
+  inspection group (version `1.2.3`) and one exact `fixed_build` vendor proof
+  bound to the observed digest.
 - `input/findings.csv`, `input/pods.json`, `input/mapping.json`,
   `input/inspection.json`, `input/advisory.json`: complete synthetic
   transcriptions of the referenced sources; their SHA-256 hashes are the ones
@@ -25,9 +26,10 @@ vendor proof bound to the observed build may conclude `fixed`.
   interval of the record in the stream (ADR-0008), and the support definition a
   proof's `basis_locator` names must exist and agree on the basis and the
   vulnerability. `TestProductFixtures` fails if a source is replaced, if a fact
-  is attributed to a record that does not state it, or if the locator collection
-  does not match the item family: the digest of the file, the item
-  `source_hash` and the resolved field are checked.
+  is attributed to a record that does not state it, if the locator does not name
+  the carrier the item type declares, or if the collection does not match the
+  item family: the digest of the file, the item `source_hash`, the resolved
+  field and the hash preimage of the value are checked.
 - `input/pack.json`: declarative pack, schema `0.1`, profile
   `product-evidence-v1`, one affirmative rule `rule.fixed` with the eleven
   minimum requirements and the `redhat_build_fixed` terminal.

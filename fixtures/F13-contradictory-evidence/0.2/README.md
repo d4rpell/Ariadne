@@ -10,21 +10,23 @@ semantic result.
 
 - `input/bundle.json`: canonical Bundle `0.2` envelope of a complete findings
   import for one synthetic subject (`uid-F13`, container `app`), with the
-  declared finding row, the container observation, the mapping group, the
-  artifact inspection group and two applicable vendor proofs of the same exact
-  build: one `vulnerable_build` and one `fixed_build`. The `proof_kind` item of
-  each proof carries one warning: a known contradictory one
+  complete declared finding row (the fifteen columns of the canonical record
+  plus the composed `requested_image`), the container observation, the mapping
+  group, the artifact inspection group and two applicable vendor proofs of the
+  same exact build: one `vulnerable_build` and one `fixed_build`. The
+  `proof_kind` item of each proof carries one warning: a known contradictory one
   (`source_conflict`) and one with an unknown code, which is uninterpretable
   for this schema version.
 - `input/findings.csv`, `input/pods.json`, `input/mapping.json`,
   `input/inspection.json`, `input/advisory.json`: complete synthetic
   transcriptions of the referenced sources. Every item is contrasted with the
-  exact field of the record its locator resolves to, and the sibling proof
-  records show why the contradiction is real: `records/proof/0` states a
-  `vulnerable_build` and `records/proof/1` a `fixed_build` for the same subject.
-  `TestProductFixtures` fails if a source is replaced or if a fact is attributed
-  to a record that does not state it: the digest of the file, the item
-  `source_hash` and the resolved field are checked.
+  exact field of the record its locator names, and the sibling proof records show
+  why the contradiction is real: `records/proof/0` states a `vulnerable_build`
+  and `records/proof/1` a `fixed_build` for the same subject.
+  `TestProductFixtures` fails if a source is replaced, if a fact is attributed to
+  a record that does not state it or if a `value_hash` does not cover the value
+  the record states: the digest of the file, the item `source_hash`, the resolved
+  field and the hash preimage are checked.
 - `input/pack.json`: declarative pack, schema `0.1`, profile
   `product-evidence-v1`, with three rules: `rule.affected` (terminal
   `redhat_build_affected`, emits `affected`), `rule.fixed` (terminal
