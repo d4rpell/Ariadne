@@ -87,10 +87,13 @@ func testProvenance(t *testing.T) RunProvenance {
 	}
 }
 
+// testBundle is the legacy fixture of schema version 0.1. The version stays
+// literal on purpose: binding it to SchemaVersionSupported would move every
+// existing regression to the new version the day the ceiling changes.
 func testBundle(t *testing.T) Bundle {
 	t.Helper()
 	return Bundle{
-		SchemaVersion:            SchemaVersionSupported,
+		SchemaVersion:            "0.1",
 		Subject:                  testSubject(),
 		Images:                   []ImageIdentity{testImage(t)},
 		Evidence:                 []EvidenceItem{testItem(t)},
@@ -126,7 +129,7 @@ func TestValidateBundleAcceptsContractShapedBundle(t *testing.T) {
 }
 
 func TestValidateSchemaVersion(t *testing.T) {
-	for _, version := range []string{"0.1", "0.0"} {
+	for _, version := range []string{"0.2", "0.1", "0.0"} {
 		if err := ValidateSchemaVersion(version); err != nil {
 			t.Errorf("ValidateSchemaVersion rejected %q: %v", version, err)
 		}
@@ -137,7 +140,7 @@ func TestValidateSchemaVersion(t *testing.T) {
 		"three parts":        "0.1.0",
 		"single number":      "0",
 		"other major":        "1.0",
-		"newer minor":        "0.2",
+		"newer minor":        "0.3",
 		"leading zero major": "01.1",
 		"leading zero minor": "0.01",
 		"missing minor":      "0.",
@@ -152,6 +155,57 @@ func TestValidateSchemaVersion(t *testing.T) {
 				t.Fatalf("ValidateSchemaVersion accepted %q", version)
 			}
 		})
+	}
+}
+
+// TestValidateBundleVersionMatrix walks the version matrix of ADR-0016 §6.1: the
+// updated reader accepts every known version it used to accept plus 0.2, and the
+// first unsupported minor is 0.3.
+func TestValidateBundleVersionMatrix(t *testing.T) {
+	for _, version := range []string{"0.0", "0.1", "0.2"} {
+		t.Run("accepts/"+version, func(t *testing.T) {
+			bundle := testBundle(t)
+			bundle.SchemaVersion = version
+			if err := ValidateBundle(bundle); err != nil {
+				t.Fatalf("ValidateBundle rejected schema_version %q: %v", version, err)
+			}
+		})
+	}
+	for name, version := range map[string]string{
+		"future minor": "0.3",
+		"other major":  "1.0",
+		"malformed":    "0.1.0",
+	} {
+		t.Run("rejects/"+name, func(t *testing.T) {
+			bundle := testBundle(t)
+			bundle.SchemaVersion = version
+			if err := ValidateBundle(bundle); err == nil {
+				t.Fatalf("ValidateBundle accepted schema_version %q", version)
+			}
+		})
+	}
+}
+
+// TestWireCarrierRemainsOpen fixes ADR-0016 §6.2: the evidence type stays a
+// carrier without a universal allowlist, so a bundle 0.2 with a type outside the
+// product catalog is still transportable, and the closed enums keep rejecting
+// values outside their vocabulary.
+func TestWireCarrierRemainsOpen(t *testing.T) {
+	foreign := testBundle(t)
+	foreign.SchemaVersion = "0.2"
+	foreign.Evidence[0].Type = "product_v1.vendor.vulnerable_code_id"
+	if err := ValidateBundle(foreign); err != nil {
+		t.Fatalf("a product_v1 type must be transportable in 0.2: %v", err)
+	}
+	unknown := testBundle(t)
+	unknown.Evidence[0].Type = "third_party.carrier.field"
+	if err := ValidateBundle(unknown); err != nil {
+		t.Fatalf("an unknown but well formed type must stay transportable: %v", err)
+	}
+	enums := testBundle(t)
+	enums.Provenance.Consistency = Consistency("eventual")
+	if err := ValidateBundle(enums); err == nil {
+		t.Fatal("a value outside the closed Consistency enum was accepted")
 	}
 }
 

@@ -11,8 +11,26 @@ func TestNewBundleAcceptsContractShapedBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBundle rejected a contract shaped bundle: %v", err)
 	}
-	if bundle.SchemaVersion != contract.SchemaVersionSupported {
+	if bundle.SchemaVersion != "0.1" {
 		t.Fatalf("NewBundle changed the bundle: %q", bundle.SchemaVersion)
+	}
+}
+
+// TestNewBundlePreservesSchemaVersion fixes that NewBundle validates but never
+// migrates: whatever known version it receives comes back unchanged.
+func TestNewBundlePreservesSchemaVersion(t *testing.T) {
+	for _, version := range []string{"0.0", "0.1", "0.2"} {
+		t.Run(version, func(t *testing.T) {
+			received := testBundle(t)
+			received.SchemaVersion = version
+			preserved, err := NewBundle(received)
+			if err != nil {
+				t.Fatalf("NewBundle rejected schema_version %q: %v", version, err)
+			}
+			if preserved.SchemaVersion != version {
+				t.Fatalf("NewBundle migrated %q to %q", version, preserved.SchemaVersion)
+			}
+		})
 	}
 }
 

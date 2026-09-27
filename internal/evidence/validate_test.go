@@ -77,6 +77,8 @@ func testProvenance(t *testing.T) contract.RunProvenance {
 	}
 }
 
+// testBundle is the legacy fixture of schema version 0.1. The literal keeps the
+// historical regression base independent from the supported ceiling.
 func testBundle(t *testing.T) contract.Bundle {
 	t.Helper()
 	subject := testSubject()
@@ -85,7 +87,7 @@ func testBundle(t *testing.T) contract.Bundle {
 	normalized := contract.NormalizedDigest("sha256:aaa")
 	observedAt := testTimestamp(t)
 	return contract.Bundle{
-		SchemaVersion: contract.SchemaVersionSupported,
+		SchemaVersion: "0.1",
 		Subject:       subject,
 		Images: []contract.ImageIdentity{{
 			ContainerClass:   contract.ContainerRegular,

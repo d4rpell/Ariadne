@@ -17,8 +17,10 @@ type enumValue interface {
 // SchemaVersionSupported is the schema version this contract reads and writes:
 // the MAJOR.MINOR grammar of ADR-0006 §6, without leading zeros. A version with
 // another major or a newer minor fails closed; there is no downgrade and no
-// implicit migration.
-const SchemaVersionSupported = "0.1"
+// implicit migration. ADR-0016 §6.1 raised the supported minor to 2 while
+// keeping the numeric comparison, so the known versions accepted before
+// (0.0, 0.1) stay accepted and 0.3 is the first unsupported minor.
+const SchemaVersionSupported = "0.2"
 
 func requireNonEmpty(field, value string) error {
 	if value == "" {

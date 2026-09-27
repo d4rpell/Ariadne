@@ -23,6 +23,8 @@ const (
 
 // testGoldenBundle exercises the frozen wire: optional values present and absent,
 // collections in non canonical order, escaped characters and two evidence items.
+// The version is the literal 0.1 of the frozen vectors: the golden comparison
+// must not follow SchemaVersionSupported when the ceiling moves (ADR-0016 §8.1).
 func testGoldenBundle(t *testing.T) contract.Bundle {
 	t.Helper()
 	subject := testSubject()
@@ -42,7 +44,7 @@ func testGoldenBundle(t *testing.T) contract.Bundle {
 	escapeProbe := `policy "default" applied \ to values`
 
 	return contract.Bundle{
-		SchemaVersion: contract.SchemaVersionSupported,
+		SchemaVersion: "0.1",
 		Subject:       subject,
 		Images: []contract.ImageIdentity{
 			{
