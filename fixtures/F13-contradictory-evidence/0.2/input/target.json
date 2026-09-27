@@ -1,10 +1,10 @@
 {
   "container_class": "regular",
   "container_name": "app",
-  "locator": "record/1/bytes/196-345",
+  "locator": "record/1/bytes/196-351",
   "observed_at": "2026-09-20T10:00:00Z",
   "source": "findings.csv",
-  "source_hash": "sha256:69a2b304f131450380e6e5bcaae141eb3912fb6664fc07910a25a3057544bd9b",
+  "source_hash": "sha256:4d8dedb9d18269b9a16e6a4b8a5e60d41cdaa88ed138220193f121ceb96cdd6c",
   "subject_uid": "uid-F13",
   "vulnerability_id": "CVE-2026-9003"
 }

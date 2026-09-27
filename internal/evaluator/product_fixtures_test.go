@@ -2,8 +2,6 @@ package evaluator
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	bundle "github.com/d4rpell/Ariadne/internal/bundle"
 	canonical "github.com/d4rpell/Ariadne/internal/evidence"
 	"github.com/d4rpell/Ariadne/internal/ingest"
+	"github.com/d4rpell/Ariadne/internal/normalize"
 	"github.com/d4rpell/Ariadne/internal/rulepack"
 	contract "github.com/d4rpell/Ariadne/pkg/evidence"
 )
@@ -104,9 +103,9 @@ func readFixtureFile(t *testing.T, path string) []byte {
 
 // assertSourcesSupportBundle fails the test on the first source-support
 // violation of the fixture.
-func assertSourcesSupportBundle(t *testing.T, input string, bundle contract.Bundle) {
+func assertSourcesSupportBundle(t *testing.T, input string, source contract.Bundle) {
 	t.Helper()
-	if err := sourcesSupportBundle(input, bundle); err != nil {
+	if err := sourcesSupportBundle(input, source); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -119,7 +118,7 @@ func assertSourcesSupportBundle(t *testing.T, input string, bundle contract.Bund
 // is always resolved: CSV records through the production parser, JSON documents
 // through the item locator. Fail-closed: an unknown item type or an unresolvable
 // locator is an error, never a pass.
-func sourcesSupportBundle(input string, bundle contract.Bundle) error {
+func sourcesSupportBundle(input string, source contract.Bundle) error {
 	cache := map[string][]byte{}
 	parsed := map[string]ingest.Result{}
 	document := func(name string) ([]byte, error) {
@@ -156,13 +155,14 @@ func sourcesSupportBundle(input string, bundle contract.Bundle) error {
 		return result, nil
 	}
 	checked := 0
-	for _, evidence := range bundle.Evidence {
+	for _, evidence := range source.Evidence {
 		body, err := document(evidence.Source)
 		if err != nil {
 			return err
 		}
-		digest := sha256.Sum256(body)
-		if want := "sha256:" + hex.EncodeToString(digest[:]); string(evidence.SourceHash) != want {
+		// The digest is computed by the producer's own hash function, so the
+		// preimage of ADR-0012 is not reimplemented here.
+		if want := string(bundle.HashSource(body)); string(evidence.SourceHash) != want {
 			return fmt.Errorf("%s: source_hash %s does not match the file digest %s", evidence.Type, evidence.SourceHash, want)
 		}
 		// The item type and the source kind must agree: a prisma-v1 item reads a
@@ -170,6 +170,7 @@ func sourcesSupportBundle(input string, bundle contract.Bundle) error {
 		if strings.HasPrefix(evidence.Type, "prisma_v1.") != strings.HasSuffix(evidence.Source, ".csv") {
 			return fmt.Errorf("%s: source %s is not the transcription kind this item type names", evidence.Type, evidence.Source)
 		}
+		var stated string
 		if strings.HasSuffix(evidence.Source, ".csv") {
 			result, err := findings(evidence.Source)
 			if err != nil {
@@ -179,33 +180,38 @@ func sourcesSupportBundle(input string, bundle contract.Bundle) error {
 			if err != nil {
 				return err
 			}
-			if evidence.Value == nil {
-				continue
-			}
-			if err := contrastPrismaRecord(finding, evidence); err != nil {
+			stated, err = statedPrismaField(finding, evidence.Type)
+			if err != nil {
 				return err
 			}
+		} else {
+			steps, err := locatorSteps(string(evidence.Locator))
+			if err != nil {
+				return fmt.Errorf("%s: locator %q: %w", evidence.Type, evidence.Locator, err)
+			}
+			stated, err = statedJSONField(body, steps, evidence)
+			if err != nil {
+				return err
+			}
+		}
+		if evidence.Value != nil && *evidence.Value != stated {
+			return fmt.Errorf("%s = %q but the transcription states %q", evidence.Type, *evidence.Value, stated)
+		}
+		// An item may legitimately carry no value — the producer keeps a value the
+		// wire cannot carry verbatim auditable by hash only (ADR-0012) — so the
+		// preimage is contrasted against the transcription whenever a hash is
+		// present, never only when a value is.
+		if evidence.ValueHash != nil {
+			if want := bundle.HashValue(stated); *evidence.ValueHash != want {
+				return fmt.Errorf("%s: value_hash %s is not the digest %s of the transcription value %q", evidence.Type, *evidence.ValueHash, want, stated)
+			}
+		}
+		if evidence.Value != nil || evidence.ValueHash != nil {
 			checked++
-			continue
 		}
-		steps, err := locatorSteps(string(evidence.Locator))
-		if err != nil {
-			return fmt.Errorf("%s: locator %q: %w", evidence.Type, evidence.Locator, err)
-		}
-		node, err := resolveSteps(body, steps)
-		if err != nil {
-			return fmt.Errorf("%s: locator %q does not resolve in %s: %w", evidence.Type, evidence.Locator, evidence.Source, err)
-		}
-		if evidence.Value == nil {
-			continue
-		}
-		if err := contrastJSONRecord(body, steps, node, evidence); err != nil {
-			return err
-		}
-		checked++
 	}
 	if checked == 0 {
-		return errors.New("the fixture carries no value to check against its sources")
+		return errors.New("the fixture carries no value or value hash to check against its sources")
 	}
 	return nil
 }
@@ -232,112 +238,162 @@ func csvFinding(result ingest.Result, locator string) (ingest.Finding, error) {
 	return finding, nil
 }
 
-// contrastPrismaRecord binds the item value to the parsed field of the record
-// the locator names. requested_image is the one derived value: ADR-0009 fixes
-// its composition, so it is contrasted against the record's declared image
-// columns instead of a column of its own.
-func contrastPrismaRecord(finding ingest.Finding, evidence contract.EvidenceItem) error {
-	value := *evidence.Value
-	field := strings.TrimPrefix(evidence.Type, "prisma_v1.")
-	if field == evidence.Type {
-		return fmt.Errorf("item type %s is not a prisma-v1 record field", evidence.Type)
+// statedPrismaField returns the exact string the parsed record states for a
+// prisma-v1 item. The fifteen declared columns of ADR-0007 are the vocabulary
+// the producer projects (internal/bundle, TestBuildMapsEveryDeclaredColumn);
+// requested_image is the one derived value and is composed by the production
+// function, so the ADR-0009 grammar is enforced rather than imitated.
+func statedPrismaField(finding ingest.Finding, itemType string) (string, error) {
+	field, ok := strings.CutPrefix(itemType, "prisma_v1.")
+	if !ok {
+		return "", fmt.Errorf("item type %s is not a prisma-v1 record field", itemType)
 	}
 	if field == "requested_image" {
-		composed := finding.ImageRegistry + "/" + finding.ImageRepository
-		if finding.ImageTag != "" {
-			composed += ":" + finding.ImageTag
+		composed, err := normalize.RequestedImage(normalize.DeclaredImage{
+			Registry:   finding.ImageRegistry,
+			Repository: finding.ImageRepository,
+			Tag:        finding.ImageTag,
+		})
+		if err != nil {
+			return "", fmt.Errorf("%s cannot be composed from the record columns: %w", itemType, err)
 		}
-		if composed != value {
-			return fmt.Errorf("requested_image %q is not the ADR-0009 composition %q of the record columns", value, composed)
-		}
-		return nil
+		return string(composed), nil
 	}
 	stated, ok := prismaRecordFields[field]
 	if !ok {
-		return fmt.Errorf("item type %s matches no declared prisma-v1 column", evidence.Type)
+		return "", fmt.Errorf("item type %s matches no declared prisma-v1 column", itemType)
 	}
-	if got := stated(finding); got != value {
-		return fmt.Errorf("%s = %q but the record states %q", evidence.Type, value, got)
-	}
-	return nil
+	return stated(finding), nil
 }
 
 // prismaRecordFields maps an item type suffix to the parsed field it must equal.
-// The names are exactly the canonical column names of ADR-0007.
+// The names are exactly the canonical column names of ADR-0007 and the fifteen
+// the producer projects.
 var prismaRecordFields = map[string]func(ingest.Finding) string{
+	"schema_version":    func(f ingest.Finding) string { return f.SchemaVersion },
 	"vulnerability_id":  func(f ingest.Finding) string { return f.VulnerabilityID },
 	"package_name":      func(f ingest.Finding) string { return f.PackageName },
 	"installed_version": func(f ingest.Finding) string { return f.InstalledVersion },
 	"fix_status":        func(f ingest.Finding) string { return f.FixStatus },
+	"image_registry":    func(f ingest.Finding) string { return f.ImageRegistry },
+	"image_repository":  func(f ingest.Finding) string { return f.ImageRepository },
+	"image_tag":         func(f ingest.Finding) string { return f.ImageTag },
 	"package_type":      func(f ingest.Finding) string { return f.PackageType },
 	"package_id":        func(f ingest.Finding) string { return f.PackageID },
 	"path":              func(f ingest.Finding) string { return f.Path },
 	"severity":          func(f ingest.Finding) string { return f.Severity },
+	"description":       func(f ingest.Finding) string { return f.Description },
+	"published_date":    func(f ingest.Finding) string { return f.PublishedDate },
+	"discovery_date":    func(f ingest.Finding) string { return f.DiscoveryDate },
 }
 
-// contrastJSONRecord binds the item value to the exact node its locator names,
-// or to the field of the record that node belongs to: the container platform
-// items share the container-status locator. Only the normalized digest keeps a
-// derived rule, stated where it is checked.
-func contrastJSONRecord(body []byte, steps []locatorStep, node any, evidence contract.EvidenceItem) error {
-	value := *evidence.Value
+// statedJSONField returns the exact string the JSON transcription states for an
+// item, after validating that the locator is the carrier the item type declares.
+// A locator that resolves to some other member, or to a nested object inside the
+// named record, is rejected even when its value would match: the field and the
+// structure are part of what the item attributes.
+func statedJSONField(body []byte, steps []locatorStep, evidence contract.EvidenceItem) (string, error) {
 	switch evidence.Type {
-	case "container_status.image_id":
-		text, ok := node.(string)
-		if !ok || text != value {
-			return fmt.Errorf("%s = %q but the document states %v", evidence.Type, value, node)
-		}
-	case "container_status.normalized_digest":
-		text, ok := node.(string)
-		at := strings.LastIndex(text, "@")
-		if !ok || at < 0 || text[at+1:] != value {
-			return fmt.Errorf("normalized_digest %q is not the digest component of %q", value, node)
-		}
-	case "container_status.platform.os", "container_status.platform.architecture":
-		parent, err := resolveSteps(body, steps[:len(steps)-1])
+	case "container_status.image_id", "container_status.normalized_digest",
+		"container_status.platform.os", "container_status.platform.architecture":
+		status, imageID, err := containerStatusRecord(body, steps, evidence)
 		if err != nil {
-			return fmt.Errorf("%s: %w", evidence.Type, err)
+			return "", err
 		}
-		record, ok := parent.(map[string]any)
-		if !ok {
-			return fmt.Errorf("%s: the locator does not resolve to a container status", evidence.Type)
-		}
-		platform, ok := record["platform"].(map[string]any)
-		if !ok {
-			return fmt.Errorf("%s: the container status carries no platform block", evidence.Type)
-		}
-		field := strings.TrimPrefix(evidence.Type, "container_status.platform.")
-		if stated, ok := platform[field].(string); !ok || stated != value {
-			return fmt.Errorf("%s = %q but the platform block states %v", evidence.Type, value, platform[field])
+		switch evidence.Type {
+		case "container_status.image_id":
+			return imageID, nil
+		case "container_status.normalized_digest":
+			// The normalized digest is derived: it is the digest component of the
+			// observed image id, never an independent claim.
+			at := strings.LastIndex(imageID, "@")
+			if at < 0 {
+				return "", fmt.Errorf("%s: the observed image id %q carries no digest component", evidence.Type, imageID)
+			}
+			return imageID[at+1:], nil
+		default:
+			platform, ok := status["platform"].(map[string]any)
+			if !ok {
+				return "", fmt.Errorf("%s: the container status carries no platform block", evidence.Type)
+			}
+			field := strings.TrimPrefix(evidence.Type, "container_status.platform.")
+			stated, ok := platform[field].(string)
+			if !ok {
+				return "", fmt.Errorf("%s: the platform block states %v", evidence.Type, platform[field])
+			}
+			return stated, nil
 		}
 	default:
+		collection, err := productRecordCollection(evidence.Type)
+		if err != nil {
+			return "", err
+		}
+		if len(steps) != 3 || steps[0].member != "records" || steps[1].member != collection || steps[2].index < 0 {
+			return "", fmt.Errorf("%s: locator %q is not a direct element of the %s collection", evidence.Type, evidence.Locator, collection)
+		}
+		// The canonical string is required too: a variant that resolves to the
+		// same node through another separator is not the locator the producer
+		// writes, and accepting it would widen the format silently.
+		if want := fmt.Sprintf("records/%s/%d", collection, steps[2].index); string(evidence.Locator) != want {
+			return "", fmt.Errorf("%s: locator %q is not the canonical form %q", evidence.Type, evidence.Locator, want)
+		}
+		node, err := resolveSteps(body, steps)
+		if err != nil {
+			return "", fmt.Errorf("%s: locator %q does not resolve in the transcription: %w", evidence.Type, evidence.Locator, err)
+		}
 		record, ok := node.(map[string]any)
 		if !ok {
-			return fmt.Errorf("%s: locator %q does not resolve to a transcription record", evidence.Type, evidence.Locator)
+			return "", fmt.Errorf("%s: locator %q does not resolve to a transcription record", evidence.Type, evidence.Locator)
 		}
 		field := evidence.Type[strings.LastIndex(evidence.Type, ".")+1:]
 		stated, ok := record[field].(string)
-		if !ok || stated != value {
-			return fmt.Errorf("%s = %q but the record states %v", evidence.Type, value, record[field])
+		if !ok {
+			return "", fmt.Errorf("%s: the record states %v, not a string", evidence.Type, record[field])
 		}
-		// The locator must name a record of the collection the item type
-		// declares: mapping, artifact and proof records share field names, so
-		// without this check a fact could be attributed across families.
-		collection, err := productRecordCollection(evidence.Type)
-		if err != nil {
-			return err
-		}
-		if !strings.HasPrefix(string(evidence.Locator), "records/"+collection+"/") {
-			return fmt.Errorf("%s: locator %q does not name a %s record of the transcription", evidence.Type, evidence.Locator, collection)
-		}
-		// A proof may not cite a basis that does not exist or that supports
-		// another vulnerability, so the support definition the record names must
-		// agree with it on both the basis and the vulnerability.
+		// A proof may not cite a basis that does not exist, that supports another
+		// vulnerability or that is the proof itself.
 		if field == "basis_locator" {
-			return assertSupportDefinition(body, record, value)
+			if err := assertSupportDefinition(body, record, stated); err != nil {
+				return "", err
+			}
 		}
+		return stated, nil
 	}
-	return nil
+}
+
+// containerStatusRecord validates the canonical observation path
+// items[N].status.containerStatuses[M].imageID and returns the container status
+// object together with the observed image id. A locator that names any other
+// member is not the declared carrier of the observation facts.
+func containerStatusRecord(body []byte, steps []locatorStep, evidence contract.EvidenceItem) (map[string]any, string, error) {
+	if len(steps) != 6 ||
+		steps[0].member != "items" || steps[1].index < 0 ||
+		steps[2].member != "status" || steps[3].member != "containerStatuses" || steps[4].index < 0 ||
+		steps[5].member != "imageID" {
+		return nil, "", fmt.Errorf("%s: locator %q does not name items[N].status.containerStatuses[M].imageID", evidence.Type, evidence.Locator)
+	}
+	// The canonical string is required too: a variant that resolves to the same
+	// node through another separator is not the locator the collector writes.
+	if want := fmt.Sprintf("items[%d].status.containerStatuses[%d].imageID", steps[1].index, steps[4].index); string(evidence.Locator) != want {
+		return nil, "", fmt.Errorf("%s: locator %q is not the canonical form %q", evidence.Type, evidence.Locator, want)
+	}
+	status, err := resolveSteps(body, steps[:5])
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: locator %q does not resolve in the transcription: %w", evidence.Type, evidence.Locator, err)
+	}
+	record, ok := status.(map[string]any)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: locator %q does not resolve to a container status", evidence.Type, evidence.Locator)
+	}
+	node, err := resolveSteps(body, steps)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: locator %q does not resolve in the transcription: %w", evidence.Type, evidence.Locator, err)
+	}
+	imageID, ok := node.(string)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: the observed image id is %v, not a string", evidence.Type, node)
+	}
+	return record, imageID, nil
 }
 
 // productRecordCollection maps a product item type to the record collection its
@@ -362,12 +418,18 @@ func productRecordCollection(itemType string) (string, error) {
 }
 
 // assertSupportDefinition resolves the support definition a proof record cites
-// and requires it to be present and to agree with the record on the basis
-// identifier and the supported vulnerability.
+// and requires it to be identified as a definition — it lives in the
+// definitions collection and carries the support member — and to agree with the
+// record on the basis identifier and the supported vulnerability. A proof
+// record cannot be its own definition: that would make the contrast a
+// tautology.
 func assertSupportDefinition(body []byte, record map[string]any, supportLocator string) error {
 	steps, err := locatorSteps(supportLocator)
 	if err != nil {
 		return fmt.Errorf("basis_locator %q: %w", supportLocator, err)
+	}
+	if len(steps) != 3 || steps[0].member != "definitions" || steps[1].index < 0 || steps[2].member != "support" {
+		return fmt.Errorf("basis_locator %q does not name a support definition of the definitions collection", supportLocator)
 	}
 	node, err := resolveSteps(body, steps)
 	if err != nil {
@@ -376,6 +438,9 @@ func assertSupportDefinition(body []byte, record map[string]any, supportLocator 
 	support, ok := node.(map[string]any)
 	if !ok {
 		return fmt.Errorf("basis_locator %q does not resolve to a support definition", supportLocator)
+	}
+	if _, self := support["proof_kind"]; self {
+		return fmt.Errorf("basis_locator %q resolves to a proof record: a proof cannot be its own basis", supportLocator)
 	}
 	statedBasis, statedOK := support["basis_id"].(string)
 	citedBasis, citedOK := record["basis_id"].(string)
@@ -586,8 +651,7 @@ func loadProductFixture(t *testing.T, slug string) fixtureFiles {
 func assertTargetRecord(t *testing.T, path string, target fixtureTarget) {
 	t.Helper()
 	body := readFixtureFile(t, path)
-	digest := sha256.Sum256(body)
-	if want := "sha256:" + hex.EncodeToString(digest[:]); target.SourceHash != want {
+	if want := string(bundle.HashSource(body)); target.SourceHash != want {
 		t.Fatalf("target source_hash %s does not match the file digest %s", target.SourceHash, want)
 	}
 	result, err := ingest.ParsePrismaV1(bytes.NewReader(body))
@@ -784,17 +848,7 @@ func TestProductFixtureTamperingIsRejected(t *testing.T) {
 		slug := "F10-redhat-backport"
 		files := loadProductFixture(t, slug)
 		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
-		work := t.TempDir()
-		entries, err := os.ReadDir(input)
-		if err != nil {
-			t.Fatalf("read fixture input: %v", err)
-		}
-		for _, entry := range entries {
-			body := readFixtureFile(t, filepath.Join(input, entry.Name()))
-			if err := os.WriteFile(filepath.Join(work, entry.Name()), body, 0o644); err != nil {
-				t.Fatalf("copy %s: %v", entry.Name(), err)
-			}
-		}
+		work := copyFixtureInput(t, input)
 		var advisory map[string]json.RawMessage
 		if err := json.Unmarshal(readFixtureFile(t, filepath.Join(input, "advisory.json")), &advisory); err != nil {
 			t.Fatalf("advisory transcription does not decode: %v", err)
@@ -807,13 +861,7 @@ func TestProductFixtureTamperingIsRejected(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(work, "advisory.json"), stripped, 0o644); err != nil {
 			t.Fatalf("write advisory transcription: %v", err)
 		}
-		digest := sha256.Sum256(stripped)
-		tampered := cloneBundle(files.bundle)
-		for index, evidence := range tampered.Evidence {
-			if evidence.Source == "advisory.json" {
-				tampered.Evidence[index].SourceHash = contract.SourceHash("sha256:" + hex.EncodeToString(digest[:]))
-			}
-		}
+		tampered := retargetSourceHash(t, files.bundle, "advisory.json", stripped)
 		err = sourcesSupportBundle(work, tampered)
 		if err == nil {
 			t.Fatal("a proof citing a support definition the transcription no longer carries was accepted")
@@ -822,6 +870,327 @@ func TestProductFixtureTamperingIsRejected(t *testing.T) {
 			t.Fatalf("rejection does not name the lost support definition: %v", err)
 		}
 	})
+
+	t.Run("observation fact cited from another member", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		tampered := cloneBundle(files.bundle)
+		moved := 0
+		for index, evidence := range tampered.Evidence {
+			if !strings.HasPrefix(evidence.Type, "container_status.") {
+				continue
+			}
+			// The container name is a real string of the same record, so every
+			// value stays true about the document: only the declared carrier is
+			// wrong.
+			tampered.Evidence[index].Locator = "items[0].status.containerStatuses[0].name"
+			setItemValue(&tampered.Evidence[index], "app")
+			moved++
+		}
+		if moved != 4 {
+			t.Fatalf("expected four observation items, moved %d", moved)
+		}
+		err := sourcesSupportBundle(filepath.Join(fixturesRoot, slug, "0.2", "input"), tampered)
+		if err == nil {
+			t.Fatal("an observation fact cited from another member of the container status was accepted")
+		}
+		if !strings.Contains(err.Error(), "imageID") {
+			t.Fatalf("rejection does not name the declared carrier: %v", err)
+		}
+	})
+
+	t.Run("domain fact attributed to a nested object", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+		work := copyFixtureInput(t, input)
+		var mapping map[string]any
+		if err := json.Unmarshal(readFixtureFile(t, filepath.Join(input, "mapping.json")), &mapping); err != nil {
+			t.Fatalf("mapping transcription does not decode: %v", err)
+		}
+		records, ok := mapping["records"].(map[string]any)
+		if !ok {
+			t.Fatal("mapping transcription has no records object")
+		}
+		list, ok := records["mapping"].([]any)
+		if !ok || len(list) == 0 {
+			t.Fatal("mapping transcription has no mapping record")
+		}
+		record, ok := list[0].(map[string]any)
+		if !ok {
+			t.Fatal("mapping record is not an object")
+		}
+		// The whole record is copied into a nested member and the outer statement
+		// is changed: every value the items carry is still true, but of a nested
+		// object rather than of an element of the mapping collection.
+		nested := make(map[string]any, len(record))
+		for key, value := range record {
+			nested[key] = value
+		}
+		record["artifact"] = nested
+		record["package_name"] = "other"
+		rewritten, err := json.Marshal(mapping)
+		if err != nil {
+			t.Fatalf("rewrite mapping transcription: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(work, "mapping.json"), rewritten, 0o644); err != nil {
+			t.Fatalf("write mapping transcription: %v", err)
+		}
+		tampered := retargetSourceHash(t, files.bundle, "mapping.json", rewritten)
+		for index, evidence := range tampered.Evidence {
+			if strings.HasPrefix(evidence.Type, "product_v1.mapping.") {
+				tampered.Evidence[index].Locator = contract.SourceLocator(string(evidence.Locator) + "/artifact")
+			}
+		}
+		err = sourcesSupportBundle(work, tampered)
+		if err == nil {
+			t.Fatal("a domain fact cited from a nested object was accepted")
+		}
+		if !strings.Contains(err.Error(), "direct element") {
+			t.Fatalf("rejection does not name the nested locator: %v", err)
+		}
+	})
+
+	t.Run("proof that presents itself as its own basis", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+		work := copyFixtureInput(t, input)
+		var advisory map[string]any
+		if err := json.Unmarshal(readFixtureFile(t, filepath.Join(input, "advisory.json")), &advisory); err != nil {
+			t.Fatalf("advisory transcription does not decode: %v", err)
+		}
+		delete(advisory, "definitions")
+		records, ok := advisory["records"].(map[string]any)
+		if !ok {
+			t.Fatal("advisory transcription has no records object")
+		}
+		proofs, ok := records["proof"].([]any)
+		if !ok || len(proofs) == 0 {
+			t.Fatal("advisory transcription has no proof record")
+		}
+		recited := 0
+		for index := range proofs {
+			record, ok := proofs[index].(map[string]any)
+			if !ok {
+				t.Fatal("proof record is not an object")
+			}
+			// The proof becomes its own basis: the record does carry a matching
+			// basis_id and vulnerability_id, so only the fact that a proof is not
+			// a definition rejects this.
+			record["basis_locator"] = "records/proof/0"
+			recited++
+		}
+		if recited == 0 {
+			t.Fatal("the fixture carries no vendor proof to rewrite")
+		}
+		rewritten, err := json.Marshal(advisory)
+		if err != nil {
+			t.Fatalf("rewrite advisory transcription: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(work, "advisory.json"), rewritten, 0o644); err != nil {
+			t.Fatalf("write advisory transcription: %v", err)
+		}
+		tampered := retargetSourceHash(t, files.bundle, "advisory.json", rewritten)
+		for index, evidence := range tampered.Evidence {
+			if evidence.Type == "product_v1.vendor.basis_locator" {
+				setItemValue(&tampered.Evidence[index], "records/proof/0")
+			}
+		}
+		err = sourcesSupportBundle(work, tampered)
+		if err == nil {
+			t.Fatal("a proof citing itself as its support definition was accepted")
+		}
+		if !strings.Contains(err.Error(), "definitions collection") {
+			t.Fatalf("rejection does not name the missing definition: %v", err)
+		}
+	})
+
+	t.Run("locator in a non canonical separator form", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		tampered := cloneBundle(files.bundle)
+		rewritten := 0
+		for index, evidence := range tampered.Evidence {
+			if strings.HasPrefix(evidence.Type, "product_v1.mapping.") {
+				// The dotted form resolves to the same record, so only the
+				// canonical-string requirement rejects it.
+				tampered.Evidence[index].Locator = contract.SourceLocator(strings.ReplaceAll(string(evidence.Locator), "/", "."))
+				rewritten++
+			}
+		}
+		if rewritten == 0 {
+			t.Fatal("the fixture carries no mapping item to rewrite")
+		}
+		err := sourcesSupportBundle(filepath.Join(fixturesRoot, slug, "0.2", "input"), tampered)
+		if err == nil {
+			t.Fatal("a locator with a non canonical separator was accepted")
+		}
+		if !strings.Contains(err.Error(), "canonical form") {
+			t.Fatalf("rejection does not name the canonical form: %v", err)
+		}
+	})
+
+	t.Run("value hash that covers no transcription value", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+		// The legitimate wire shape first: a value the wire cannot carry verbatim
+		// is kept auditable by hash only (ADR-0012), and it must still pass.
+		legitimate := cloneBundle(files.bundle)
+		for index, evidence := range legitimate.Evidence {
+			if evidence.Type == "prisma_v1.severity" {
+				legitimate.Evidence[index].Value = nil
+			}
+		}
+		if err := sourcesSupportBundle(input, legitimate); err != nil {
+			t.Fatalf("the legitimate hash-only shape was rejected: %v", err)
+		}
+		tampered := cloneBundle(files.bundle)
+		stale := contract.ValueHash("sha256:" + strings.Repeat("ab", 32))
+		replaced := 0
+		for index, evidence := range tampered.Evidence {
+			if evidence.Type != "prisma_v1.severity" {
+				continue
+			}
+			tampered.Evidence[index].Value = nil
+			tampered.Evidence[index].ValueHash = &stale
+			replaced++
+		}
+		if replaced != 1 {
+			t.Fatalf("expected one severity item, replaced %d", replaced)
+		}
+		err := sourcesSupportBundle(input, tampered)
+		if err == nil {
+			t.Fatal("a value_hash that covers no transcription value was accepted")
+		}
+		if !strings.Contains(err.Error(), "value_hash") {
+			t.Fatalf("rejection does not name the hash: %v", err)
+		}
+	})
+}
+
+// TestProductFixtureRequestedImageGrammar requires the harness to compose the
+// reference with the production grammar of ADR-0009 instead of imitating its
+// concatenation: a declaration the rule refuses cannot be presented as a
+// composed reference.
+func TestProductFixtureRequestedImageGrammar(t *testing.T) {
+	finding := ingest.Finding{
+		ImageRegistry:   "reg/example",
+		ImageRepository: "app",
+		ImageTag:        "release",
+	}
+	if _, err := statedPrismaField(finding, "prisma_v1.requested_image"); err == nil {
+		t.Fatal("a registry that is not an authority was accepted as a composed reference")
+	}
+	finding.ImageTag = "1"
+	if _, err := statedPrismaField(finding, "prisma_v1.requested_image"); err == nil {
+		t.Fatal("a tag the canonical grammar refuses was accepted as a composed reference")
+	}
+	finding.ImageRegistry = "reg.example"
+	finding.ImageTag = "release"
+	stated, err := statedPrismaField(finding, "prisma_v1.requested_image")
+	if err != nil {
+		t.Fatalf("a canonical declaration was refused: %v", err)
+	}
+	if stated != "reg.example/app:release" {
+		t.Fatalf("composed reference %q, want reg.example/app:release", stated)
+	}
+}
+
+// TestProductFixturePrismaVocabularyCoversProducer requires the harness to
+// accept every declared column the producer projects, plus the composed
+// reference: the sixteen item types that internal/bundle pins in
+// TestBuildMapsEveryDeclaredColumn. The fixture CSV is the source, so a column
+// the producer would project cannot be rejected as unknown, and the stated
+// value must be the one the committed bundle carries.
+func TestProductFixturePrismaVocabularyCoversProducer(t *testing.T) {
+	slug := "F10-redhat-backport"
+	files := loadProductFixture(t, slug)
+	body := readFixtureFile(t, filepath.Join(fixturesRoot, slug, "0.2", "input", "findings.csv"))
+	result, err := ingest.ParsePrismaV1(bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("fixture CSV does not parse: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("findings = %d, want exactly one record", len(result.Findings))
+	}
+	finding := result.Findings[0]
+	committed := map[string]string{}
+	for _, evidence := range files.bundle.Evidence {
+		if evidence.Value != nil {
+			committed[evidence.Type] = *evidence.Value
+		}
+	}
+	columns := []string{
+		"schema_version", "vulnerability_id", "package_name", "installed_version", "fix_status",
+		"image_registry", "image_repository", "image_tag", "package_type", "package_id", "path",
+		"severity", "description", "published_date", "discovery_date",
+	}
+	for _, column := range columns {
+		itemType := "prisma_v1." + column
+		stated, err := statedPrismaField(finding, itemType)
+		if err != nil {
+			t.Fatalf("the harness rejects the declared column %s: %v", column, err)
+		}
+		want, ok := committed[itemType]
+		if !ok {
+			t.Fatalf("the committed fixture carries no %s item", itemType)
+		}
+		if stated != want {
+			t.Fatalf("%s: the harness states %q, the fixture carries %q", itemType, stated, want)
+		}
+	}
+	composed, err := statedPrismaField(finding, "prisma_v1.requested_image")
+	if err != nil {
+		t.Fatalf("the harness refuses the composed reference: %v", err)
+	}
+	if want := committed["prisma_v1.requested_image"]; composed != want {
+		t.Fatalf("requested_image: the harness composes %q, the fixture carries %q", composed, want)
+	}
+}
+
+// copyFixtureInput copies the input directory of a fixture to a temporary
+// directory, so a tamper can rewrite a transcription without touching the
+// repository.
+func copyFixtureInput(t *testing.T, input string) string {
+	t.Helper()
+	work := t.TempDir()
+	entries, err := os.ReadDir(input)
+	if err != nil {
+		t.Fatalf("read fixture input: %v", err)
+	}
+	for _, entry := range entries {
+		body := readFixtureFile(t, filepath.Join(input, entry.Name()))
+		if err := os.WriteFile(filepath.Join(work, entry.Name()), body, 0o644); err != nil {
+			t.Fatalf("copy %s: %v", entry.Name(), err)
+		}
+	}
+	return work
+}
+
+// retargetSourceHash points every item of one source at the digest of a
+// rewritten transcription, so the tamper survives the digest check and reaches
+// the contrast under test.
+func retargetSourceHash(t *testing.T, source contract.Bundle, name string, body []byte) contract.Bundle {
+	t.Helper()
+	digest := bundle.HashSource(body)
+	cloned := cloneBundle(source)
+	for index, evidence := range cloned.Evidence {
+		if evidence.Source == name {
+			cloned.Evidence[index].SourceHash = digest
+		}
+	}
+	return cloned
+}
+
+// setItemValue rewrites an item value and its hash together, so a tamper keeps
+// the wire internally consistent instead of failing on an unrelated
+// inconsistency.
+func setItemValue(item *contract.EvidenceItem, value string) {
+	item.Value = &value
+	hash := bundle.HashValue(value)
+	item.ValueHash = &hash
 }
 
 // assertF10LinkNegatives derives, in memory and per link of the identity chain,

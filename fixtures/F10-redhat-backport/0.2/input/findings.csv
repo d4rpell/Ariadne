@@ -1,2 +1,2 @@
 schema_version,vulnerability_id,package_name,installed_version,fix_status,image_registry,image_repository,image_tag,package_type,package_id,path,severity,description,published_date,discovery_date
-1.0,CVE-2026-9002,openssl,1.2.3-1,fixed,reg.example,app,1,rpm,pkg-1,usr/lib64/openssl,low,synthetic description of the finding,2026-09-01,2026-09-02
+1.0,CVE-2026-9002,openssl,1.2.3-1,fixed,reg.example,app,release,rpm,pkg-1,usr/lib64/openssl,low,synthetic description of the finding,2026-09-01,2026-09-02

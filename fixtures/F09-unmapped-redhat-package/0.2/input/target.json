@@ -1,10 +1,10 @@
 {
   "container_class": "regular",
   "container_name": "app",
-  "locator": "record/1/bytes/196-345",
+  "locator": "record/1/bytes/196-351",
   "observed_at": "2026-09-20T10:00:00Z",
   "source": "findings.csv",
-  "source_hash": "sha256:b3bf665d587cac79ad1abfd6b33ebb9484a78a0a272f976688152a9694ce1bb1",
+  "source_hash": "sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f",
   "subject_uid": "uid-F09",
   "vulnerability_id": "CVE-2026-9001"
 }
