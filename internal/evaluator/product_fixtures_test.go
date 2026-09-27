@@ -393,6 +393,37 @@ func containerStatusRecord(body []byte, steps []locatorStep, evidence contract.E
 	if !ok {
 		return nil, "", fmt.Errorf("%s: the observed image id is %v, not a string", evidence.Type, node)
 	}
+	// The observation is only evidence about the subject and the container the
+	// item attributes it to: the pod the locator names must carry the item's
+	// subject uid and the container status must be the item's container. Another
+	// container of the same pod, or the same container of another pod, would
+	// otherwise be certified as this item's source.
+	pod, err := resolveSteps(body, steps[:2])
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: locator %q does not resolve to a pod: %w", evidence.Type, evidence.Locator, err)
+	}
+	podObject, ok := pod.(map[string]any)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: locator %q does not resolve to a pod", evidence.Type, evidence.Locator)
+	}
+	metadata, ok := podObject["metadata"].(map[string]any)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: the pod the locator names carries no metadata block", evidence.Type)
+	}
+	uid, ok := metadata["uid"].(string)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: the pod the locator names states uid %v, not a string", evidence.Type, metadata["uid"])
+	}
+	if want := string(evidence.Scope.SubjectUID); uid != want {
+		return nil, "", fmt.Errorf("%s: the pod the locator names carries uid %q, the item is scoped to %q", evidence.Type, uid, want)
+	}
+	name, ok := record["name"].(string)
+	if !ok {
+		return nil, "", fmt.Errorf("%s: the container status states name %v, not a string", evidence.Type, record["name"])
+	}
+	if want := string(evidence.Scope.ContainerName); name != want {
+		return nil, "", fmt.Errorf("%s: the locator names container %q, the item is scoped to %q", evidence.Type, name, want)
+	}
 	return record, imageID, nil
 }
 
@@ -1006,6 +1037,97 @@ func TestProductFixtureTamperingIsRejected(t *testing.T) {
 		}
 	})
 
+	t.Run("observation attributed to another container of the pod", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+		work := copyFixtureInput(t, input)
+		rewritten, err := rewritePodStatuses(t, input, func(statuses []any) []any {
+			// A second container carries the digest the items credit; the real
+			// container keeps a different one.
+			sidecar, ok := statuses[0].(map[string]any)
+			if !ok {
+				t.Fatal("the container status is not an object")
+			}
+			clone := make(map[string]any, len(sidecar))
+			for key, value := range sidecar {
+				clone[key] = value
+			}
+			clone["name"] = "sidecar"
+			// The container the items are scoped to no longer carries the credited
+			// digest: the value only survives in the other container.
+			sidecar["imageID"] = "reg.example/app@sha256:" + strings.Repeat("9", 64)
+			return append([]any{clone}, statuses...)
+		})
+		if err != nil {
+			t.Fatalf("rewrite pod statuses: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(work, "pods.json"), rewritten, 0o644); err != nil {
+			t.Fatalf("write pod transcription: %v", err)
+		}
+		tampered := retargetSourceHash(t, files.bundle, "pods.json", rewritten)
+		moved := 0
+		for index, evidence := range tampered.Evidence {
+			if !strings.HasPrefix(evidence.Type, "container_status.") {
+				continue
+			}
+			// The sidecar now sits at index 0 and carries the credited digest, so
+			// every value stays true: only the container name in the scope
+			// distinguishes it from the container the item attributes it to.
+			tampered.Evidence[index].Locator = "items[0].status.containerStatuses[0].imageID"
+			moved++
+		}
+		if moved != 4 {
+			t.Fatalf("expected four observation items, moved %d", moved)
+		}
+		err = sourcesSupportBundle(work, tampered)
+		if err == nil {
+			t.Fatal("an observation attributed to another container of the pod was accepted")
+		}
+		if !strings.Contains(err.Error(), "sidecar") {
+			t.Fatalf("rejection does not name the container it resolved: %v", err)
+		}
+	})
+
+	t.Run("observation attributed to a foreign subject", func(t *testing.T) {
+		slug := "F10-redhat-backport"
+		files := loadProductFixture(t, slug)
+		input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+		work := copyFixtureInput(t, input)
+		var pod map[string]any
+		if err := json.Unmarshal(readFixtureFile(t, filepath.Join(input, "pods.json")), &pod); err != nil {
+			t.Fatalf("pod transcription does not decode: %v", err)
+		}
+		items, ok := pod["items"].([]any)
+		if !ok || len(items) == 0 {
+			t.Fatal("pod transcription has no items")
+		}
+		entry, ok := items[0].(map[string]any)
+		if !ok {
+			t.Fatal("pod entry is not an object")
+		}
+		metadata, ok := entry["metadata"].(map[string]any)
+		if !ok {
+			t.Fatal("pod entry has no metadata block")
+		}
+		metadata["uid"] = "uid-other"
+		rewritten, err := json.Marshal(pod)
+		if err != nil {
+			t.Fatalf("rewrite pod transcription: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(work, "pods.json"), rewritten, 0o644); err != nil {
+			t.Fatalf("write pod transcription: %v", err)
+		}
+		tampered := retargetSourceHash(t, files.bundle, "pods.json", rewritten)
+		err = sourcesSupportBundle(work, tampered)
+		if err == nil {
+			t.Fatal("an observation attributed to a foreign subject was accepted")
+		}
+		if !strings.Contains(err.Error(), "uid-other") {
+			t.Fatalf("rejection does not name the uid it resolved: %v", err)
+		}
+	})
+
 	t.Run("locator in a non canonical separator form", func(t *testing.T) {
 		slug := "F10-redhat-backport"
 		files := loadProductFixture(t, slug)
@@ -1148,6 +1270,81 @@ func TestProductFixturePrismaVocabularyCoversProducer(t *testing.T) {
 	if want := committed["prisma_v1.requested_image"]; composed != want {
 		t.Fatalf("requested_image: the harness composes %q, the fixture carries %q", composed, want)
 	}
+}
+
+// TestProductFixtureObservationFollowsTheContainer proves the identity contrast
+// is a scope check and not a fixed index: with the same pod and the same
+// containers in another order, an item that cites the second position for its
+// own container is accepted.
+func TestProductFixtureObservationFollowsTheContainer(t *testing.T) {
+	slug := "F10-redhat-backport"
+	files := loadProductFixture(t, slug)
+	input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+	work := copyFixtureInput(t, input)
+	rewritten, err := rewritePodStatuses(t, input, func(statuses []any) []any {
+		// The container the items attribute their facts to moves to the second
+		// position; another container takes the first.
+		app, ok := statuses[0].(map[string]any)
+		if !ok {
+			t.Fatal("the container status is not an object")
+		}
+		first := make(map[string]any, len(app))
+		for key, value := range app {
+			first[key] = value
+		}
+		first["name"] = "sidecar"
+		return []any{first, app}
+	})
+	if err != nil {
+		t.Fatalf("rewrite pod statuses: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "pods.json"), rewritten, 0o644); err != nil {
+		t.Fatalf("write pod transcription: %v", err)
+	}
+	reordered := retargetSourceHash(t, files.bundle, "pods.json", rewritten)
+	moved := 0
+	for index, evidence := range reordered.Evidence {
+		if !strings.HasPrefix(evidence.Type, "container_status.") {
+			continue
+		}
+		reordered.Evidence[index].Locator = "items[0].status.containerStatuses[1].imageID"
+		moved++
+	}
+	if moved != 4 {
+		t.Fatalf("expected four observation items, moved %d", moved)
+	}
+	if err := sourcesSupportBundle(work, reordered); err != nil {
+		t.Fatalf("an observation that cites its own container out of index zero was rejected: %v", err)
+	}
+}
+
+// rewritePodStatuses rewrites the container statuses of the first pod of a pod
+// transcription with the transformation, so a tamper can move a credited digest
+// to another container without touching the repository.
+func rewritePodStatuses(t *testing.T, input string, transform func([]any) []any) ([]byte, error) {
+	t.Helper()
+	var pod map[string]any
+	if err := json.Unmarshal(readFixtureFile(t, filepath.Join(input, "pods.json")), &pod); err != nil {
+		return nil, err
+	}
+	items, ok := pod["items"].([]any)
+	if !ok || len(items) == 0 {
+		return nil, errors.New("pod transcription has no items")
+	}
+	entry, ok := items[0].(map[string]any)
+	if !ok {
+		return nil, errors.New("pod entry is not an object")
+	}
+	status, ok := entry["status"].(map[string]any)
+	if !ok {
+		return nil, errors.New("pod entry has no status block")
+	}
+	statuses, ok := status["containerStatuses"].([]any)
+	if !ok {
+		return nil, errors.New("pod entry has no container statuses")
+	}
+	status["containerStatuses"] = transform(statuses)
+	return json.Marshal(pod)
 }
 
 // copyFixtureInput copies the input directory of a fixture to a temporary
