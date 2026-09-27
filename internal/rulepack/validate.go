@@ -5,14 +5,17 @@ import (
 	"unicode"
 )
 
-// validate applies the closed domain rules of ADR-0013 §5.1 and §6. Unknown
-// schema, profile, predicate, requirement, field or output is unsupported; a
-// known vocabulary member used with the wrong shape is invalid.
+// validate applies the closed domain rules of ADR-0013 §5.1 and §6, and of
+// ADR-0015 §8 for the product profile. Unknown schema, profile, predicate,
+// requirement, field or output is unsupported; a known vocabulary member used
+// with the wrong shape is invalid.
 func (pack Pack) validate() error {
 	if pack.SchemaVersion != SupportedSchemaVersion {
 		return problem(CodeUnsupportedPack, -1)
 	}
-	if pack.Profile != SupportedProfile {
+	switch pack.Profile {
+	case SupportedProfile, ProductEvidenceProfile:
+	default:
 		return problem(CodeUnsupportedPack, -1)
 	}
 	if !validID(pack.PackID) {
@@ -31,7 +34,7 @@ func (pack Pack) validate() error {
 	seenRules := make(map[string]bool, len(pack.Rules))
 	totalChecks := 0
 	for index, rule := range pack.Rules {
-		if err := rule.validate(index); err != nil {
+		if err := rule.validate(index, pack.Profile); err != nil {
 			return err
 		}
 		if seenRules[rule.RuleID] {
@@ -46,7 +49,7 @@ func (pack Pack) validate() error {
 	return nil
 }
 
-func (rule Rule) validate(index int) error {
+func (rule Rule) validate(index int, profile string) error {
 	if !validID(rule.RuleID) {
 		return invalidProblem(index)
 	}
@@ -61,7 +64,7 @@ func (rule Rule) validate(index int) error {
 	}
 	declared := make(map[Requirement]bool, len(rule.Requires))
 	for _, requirement := range rule.Requires {
-		if !requirementValid(requirement) {
+		if !requirementValidFor(profile, requirement) {
 			return problem(CodeUnsupportedPack, index)
 		}
 		if declared[requirement] {
@@ -69,8 +72,8 @@ func (rule Rule) validate(index int) error {
 		}
 		declared[requirement] = true
 	}
-	// Every rule of this profile rests on a complete method-specific capture and
-	// on the finding row of its target.
+	// Every rule rests on a complete method-specific capture and on the finding
+	// row of its target.
 	if !declared[RequirementBundleComplete] || !declared[RequirementFindingRow] {
 		return invalidProblem(index)
 	}
@@ -79,16 +82,20 @@ func (rule Rule) validate(index int) error {
 		return invalidProblem(index)
 	}
 	seenChecks := make(map[string]bool, len(rule.Checks))
+	terminals := 0
 	for _, check := range rule.Checks {
-		if err := check.validate(index); err != nil {
+		if err := check.validate(index, profile); err != nil {
 			return err
 		}
 		if seenChecks[check.CheckID] {
 			return invalidProblem(index)
 		}
 		seenChecks[check.CheckID] = true
+		if isTerminalPredicate(check.Predicate) {
+			terminals++
+		}
 		// A predicate's mandatory requirements cannot be omitted by the pack.
-		for _, required := range mandatoryRequirements(check) {
+		for _, required := range mandatoryRequirementsFor(profile, check) {
 			if !declared[required] {
 				return invalidProblem(index)
 			}
@@ -98,13 +105,48 @@ func (rule Rule) validate(index int) error {
 	if rule.OnMissingEvidence != OutputUnderInvestigation {
 		return problem(CodeUnsupportedPack, index)
 	}
+
+	if profile == ProductEvidenceProfile {
+		return rule.validateProduct(index, declared, terminals)
+	}
 	if rule.Emit != OutputUnderInvestigation {
 		return problem(CodeUnsupportedPack, index)
 	}
 	return nil
 }
 
-func (check Check) validate(index int) error {
+// validateProduct applies ADR-0015 §8.1 and §8.3 to one rule of the product
+// profile: the affirmative emits have exactly one matching terminal and the
+// eleven explicit requirements, and no rule silently derives an omitted one.
+func (rule Rule) validateProduct(index int, declared map[Requirement]bool, terminals int) error {
+	if rule.Emit == OutputUnderInvestigation {
+		return nil
+	}
+	terminal, ok := terminalPredicateFor(rule.Emit)
+	if !ok {
+		return problem(CodeUnsupportedPack, index)
+	}
+	if terminals != 1 {
+		return invalidProblem(index)
+	}
+	matched := false
+	for _, check := range rule.Checks {
+		if check.Predicate == terminal {
+			matched = true
+		}
+	}
+	if !matched {
+		return invalidProblem(index)
+	}
+	for _, required := range ProductAffirmativeRequirements {
+		if !declared[required] {
+			return invalidProblem(index)
+		}
+	}
+	return nil
+}
+
+func (check Check) validate(index int, profile string) error {
 	if !validID(check.CheckID) {
 		return invalidProblem(index)
 	}
@@ -140,6 +182,15 @@ func (check Check) validate(index int) error {
 		if !validParamString(check.Params.OS) || !validParamString(check.Params.Architecture) {
 			return invalidProblem(index)
 		}
+	case PredicateRedhatProductMapped, PredicateRedhatArtifactBound,
+		PredicateRedhatBuildAffected, PredicateRedhatBuildFixed, PredicateRedhatCodeExcluded:
+		// Domain predicates exist only in the product profile and take no params.
+		if profile != ProductEvidenceProfile {
+			return problem(CodeUnsupportedPack, index)
+		}
+		if check.Params.FieldSet || check.Params.ValueSet || check.Params.OSSet || check.Params.ArchitectureSet {
+			return invalidProblem(index)
+		}
 	default:
 		return problem(CodeUnsupportedPack, index)
 	}
@@ -147,6 +198,13 @@ func (check Check) validate(index int) error {
 }
 
 func mandatoryRequirements(check Check) []Requirement {
+	return mandatoryRequirementsFor(SupportedProfile, check)
+}
+
+// mandatoryRequirementsFor is the per-profile map of predicate requirements.
+// The legacy profile keeps its four predicates; the product profile adds the
+// five domain ones with the explicit lists of ADR-0015 §8.3.
+func mandatoryRequirementsFor(profile string, check Check) []Requirement {
 	switch check.Predicate {
 	case PredicateFindingFieldPresent, PredicateFindingFieldEquals:
 		return []Requirement{FindingRequirement(FieldID(check.Params.Field))}
@@ -154,15 +212,58 @@ func mandatoryRequirements(check Check) []Requirement {
 		return []Requirement{RequirementImageBoundDigest}
 	case PredicateImagePlatformKnown:
 		return []Requirement{RequirementImageBoundDigest, RequirementImageKnownPlatform}
+	case PredicateRedhatProductMapped:
+		return []Requirement{
+			FindingRequirement(FieldPackageType),
+			FindingRequirement(FieldPackageName),
+			FindingRequirement(FieldPackageID),
+			RequirementDomainMapping,
+		}
+	case PredicateRedhatArtifactBound:
+		return []Requirement{
+			FindingRequirement(FieldPackageType),
+			FindingRequirement(FieldPackageName),
+			FindingRequirement(FieldPackageID),
+			RequirementImageBoundDigest,
+			RequirementImageKnownPlatform,
+			RequirementDomainMapping,
+			RequirementDomainArtifact,
+		}
+	case PredicateRedhatBuildAffected, PredicateRedhatBuildFixed, PredicateRedhatCodeExcluded:
+		if profile != ProductEvidenceProfile {
+			return nil
+		}
+		return []Requirement{
+			FindingRequirement(FieldPackageType),
+			FindingRequirement(FieldPackageName),
+			FindingRequirement(FieldPackageID),
+			RequirementImageBoundDigest,
+			RequirementImageKnownPlatform,
+			RequirementDomainMapping,
+			RequirementDomainArtifact,
+			RequirementDomainVendorProof,
+			RequirementDomainCurrent,
+		}
 	}
 	return nil
 }
 
 func requirementValid(requirement Requirement) bool {
+	return requirementValidFor(SupportedProfile, requirement)
+}
+
+// requirementValidFor is the per-profile requirement vocabulary: the legacy
+// profile keeps its own names, and the four domain requirements of ADR-0015 §8.1
+// exist only in the product profile. Readiness must not carry an inert domain
+// requirement it can never satisfy.
+func requirementValidFor(profile string, requirement Requirement) bool {
 	switch requirement {
 	case RequirementBundleComplete, RequirementFindingRow,
 		RequirementImageBoundDigest, RequirementImageKnownPlatform:
 		return true
+	case RequirementDomainMapping, RequirementDomainArtifact,
+		RequirementDomainVendorProof, RequirementDomainCurrent:
+		return profile == ProductEvidenceProfile
 	}
 	const prefix = "finding."
 	if strings.HasPrefix(string(requirement), prefix) {

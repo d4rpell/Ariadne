@@ -60,6 +60,22 @@ func (context AdmissionContext) Validate() error {
 // pack bytes, syntax and schema, pinned identity, version policy, validity. A
 // failure rejects admission and produces no evaluation input at all.
 func Admit(data []byte, context AdmissionContext) (AdmittedPack, error) {
+	return admit(data, context, "")
+}
+
+// AdmitForBundle is Admit plus the profile/version cross of ADR-0015 §7.3: the
+// product profile requires Bundle 0.2, and any other version is the illegal
+// combination invalid_pack. The cross sits inside the syntax/schema/profile
+// phase, after the pack hash is verified and the vocabulary is known, and before
+// identity, anti-downgrade and validity, so it wins over pack_expired and
+// ruleset_mismatch but never over pack_hash_mismatch. An empty bundleSchemaVersion
+// means the caller has no bundle to cross and skips the check, which is what the
+// legacy Admit path does.
+func AdmitForBundle(data []byte, context AdmissionContext, bundleSchemaVersion string) (AdmittedPack, error) {
+	return admit(data, context, bundleSchemaVersion)
+}
+
+func admit(data []byte, context AdmissionContext, bundleSchemaVersion string) (AdmittedPack, error) {
 	if len(data) > MaxPackBytes {
 		return AdmittedPack{}, limitProblem()
 	}
@@ -76,6 +92,9 @@ func Admit(data []byte, context AdmissionContext) (AdmittedPack, error) {
 	pack, err := Decode(data)
 	if err != nil {
 		return AdmittedPack{}, err
+	}
+	if bundleSchemaVersion != "" && pack.Profile == ProductEvidenceProfile && bundleSchemaVersion != ProductBundleSchemaVersion {
+		return AdmittedPack{}, problem(CodeInvalidPack, -1)
 	}
 	if pack.PackID != context.ExpectedPackID {
 		return AdmittedPack{}, problem(CodePackIdentityMismatch, -1)

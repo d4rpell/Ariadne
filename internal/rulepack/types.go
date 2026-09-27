@@ -10,11 +10,28 @@ import (
 const (
 	SupportedSchemaVersion = "0.1"
 	SupportedProfile       = "evidence-readiness-v1"
+	// ProductEvidenceProfile is the affirmative domain profile of ADR-0015. It
+	// requires Bundle 0.2 (ADR-0016 §6.1) and declares its own closed vocabulary:
+	// three affirmative emits, four domain requirements and five predicates.
+	ProductEvidenceProfile = "product-evidence-v1"
+	// ProductBundleSchemaVersion is the only Bundle schema the product profile
+	// admits (ADR-0015 §7.3). Another version is the illegal combination
+	// invalid_pack, never a malformed bundle.
+	ProductBundleSchemaVersion = "0.2"
 )
 
-// OutputUnderInvestigation is the only state a rule of this profile may emit or
-// leave as its missing-evidence outcome (ADR-0013 §7).
+// OutputUnderInvestigation is the only state the legacy profile may emit or leave
+// as its missing-evidence outcome (ADR-0013 §7). It is also the only
+// missing-evidence outcome of the product profile.
 const OutputUnderInvestigation = "under_investigation"
+
+// Affirmative emits of the product profile (ADR-0015 §8.3). The legacy profile
+// admits none of them, and each one has exactly one terminal predicate.
+const (
+	OutputAffected    = "affected"
+	OutputFixed       = "fixed"
+	OutputNotAffected = "not_affected"
+)
 
 // Shape, count and byte limits of ADR-0013 §5.4.
 const (
@@ -61,7 +78,38 @@ const (
 	RequirementFindingRow         Requirement = "finding.row"
 	RequirementImageBoundDigest   Requirement = "image.bound_digest"
 	RequirementImageKnownPlatform Requirement = "image.known_platform"
+	// Domain requirements of the product profile (ADR-0015 §8.1). They are
+	// recognized names in this reader; the product profile is what requires them
+	// explicitly on every affirmative rule.
+	RequirementDomainMapping     Requirement = "domain.mapping"
+	RequirementDomainArtifact    Requirement = "domain.artifact"
+	RequirementDomainVendorProof Requirement = "domain.vendor_proof"
+	RequirementDomainCurrent     Requirement = "domain.current"
 )
+
+// ProductBaseRequirements are the two requirements every rule of the product
+// profile declares, including the inconclusive ones (ADR-0015 §8.1).
+var ProductBaseRequirements = []Requirement{
+	RequirementBundleComplete,
+	RequirementFindingRow,
+}
+
+// ProductAffirmativeRequirements are the eleven minimum requirements of an
+// affirmative rule: the two base ones plus these nine. The engine validates
+// their presence; it never inserts an omitted one.
+var ProductAffirmativeRequirements = []Requirement{
+	RequirementBundleComplete,
+	RequirementFindingRow,
+	FindingRequirement(FieldPackageType),
+	FindingRequirement(FieldPackageName),
+	FindingRequirement(FieldPackageID),
+	RequirementImageBoundDigest,
+	RequirementImageKnownPlatform,
+	RequirementDomainMapping,
+	RequirementDomainArtifact,
+	RequirementDomainVendorProof,
+	RequirementDomainCurrent,
+}
 
 // FindingRequirement is the requirement that evidences one finding field.
 func FindingRequirement(field FieldID) Requirement {
@@ -77,6 +125,58 @@ const (
 	PredicateImageDigestBound    PredicateID = "image_digest_bound"
 	PredicateImagePlatformKnown  PredicateID = "image_platform_known"
 )
+
+// The five domain predicates of the product profile (ADR-0015 §8.3). The three
+// terminal ones are exclusive: each affirmative emit has exactly one.
+const (
+	PredicateRedhatProductMapped PredicateID = "redhat_product_mapped"
+	PredicateRedhatArtifactBound PredicateID = "redhat_artifact_bound"
+	PredicateRedhatBuildAffected PredicateID = "redhat_build_affected"
+	PredicateRedhatBuildFixed    PredicateID = "redhat_build_fixed"
+	PredicateRedhatCodeExcluded  PredicateID = "redhat_build_code_excluded"
+)
+
+// terminalPredicateFor maps an affirmative emit to its single admitted terminal.
+func terminalPredicateFor(emit string) (PredicateID, bool) {
+	switch emit {
+	case OutputAffected:
+		return PredicateRedhatBuildAffected, true
+	case OutputFixed:
+		return PredicateRedhatBuildFixed, true
+	case OutputNotAffected:
+		return PredicateRedhatCodeExcluded, true
+	}
+	return "", false
+}
+
+// isTerminalPredicate reports whether a predicate can only appear as the single
+// terminal of an affirmative rule.
+func isTerminalPredicate(predicate PredicateID) bool {
+	_, ok := terminalPredicateFor(emitOfPredicate(predicate))
+	return ok
+}
+
+func emitOfPredicate(predicate PredicateID) string {
+	switch predicate {
+	case PredicateRedhatBuildAffected:
+		return OutputAffected
+	case PredicateRedhatBuildFixed:
+		return OutputFixed
+	case PredicateRedhatCodeExcluded:
+		return OutputNotAffected
+	}
+	return ""
+}
+
+// isDomainPredicate reports whether a predicate belongs to the product profile.
+func isDomainPredicate(predicate PredicateID) bool {
+	switch predicate {
+	case PredicateRedhatProductMapped, PredicateRedhatArtifactBound,
+		PredicateRedhatBuildAffected, PredicateRedhatBuildFixed, PredicateRedhatCodeExcluded:
+		return true
+	}
+	return false
+}
 
 // Params is the typed parameter shape of one check. Which members are present is
 // part of the contract, so presence is tracked explicitly instead of relying on
