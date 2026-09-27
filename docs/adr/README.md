@@ -16,7 +16,7 @@ Each record follows the same template:
 
 | Section | Content |
 |---|---|
-| Status | `accepted`, `superseded` or `withdrawn`, and the date |
+| Status | `accepted`, `superseded` or `withdrawn`, and the date. A record may also appear as `proposed`: a written proposal pending review and ratification, not yet a decision |
 | Decision | What was decided, in one or two sentences |
 | Context | The problem, the constraints and the evidence available at the time |
 | Options considered | Every realistic option, including the discarded ones |
@@ -48,6 +48,13 @@ Two rules apply to every record:
 | [ADR-0012](ADR-0012-evidence-bundle-integration-precisions.md) | Evidence item mapping, value-hash preimage, source hash and omission semantics | accepted (2026-09-26) |
 | [ADR-0013](ADR-0013-offline-evaluator-contract.md) | Conservative evaluator profile, pack admission and reproducibility | ratified (2026-09-26); implemented, pending acceptance review |
 | [ADR-0014](ADR-0014-static-import-closure.md) | Static closure of local production imports | ratified (2026-09-26); implemented, pending acceptance review |
+| [ADR-0015](ADR-0015-domain-contract-and-affirmative-evaluation.md) | Domain contract and affirmative product evaluation: profile, evidence families, conflict policy | ratified (2026-09-26); implemented (2026-09-27), pending acceptance review |
+| [ADR-0016](ADR-0016-wire-versioning-and-product-vocabulary.md) | Wire versioning to `0.2` for the product vocabulary, digest-class claim and emission policy | ratified (2026-09-26); implemented (2026-09-27), pending acceptance review |
+| [ADR-0017](ADR-0017-optional-governance-platform-and-timeline.md) | Optional governance platform, private-image evidence and append-only timeline | ratified (2026-09-26); not implemented |
+| [ADR-0018](ADR-0018-domain-context-and-profile-recognition.md) | Domain context combinations and bounded profile recognition | accepted under delegated authority (2026-09-26); implemented (2026-09-27), pending acceptance review |
+| [ADR-0019](ADR-0019-operating-modes-and-persistent-tracking.md) | Operating modes (occasional vs. tracking), temporal semantics, chart meaning, hot/warm/cold storage and external-policy export | proposed (2026-09-27); not implemented |
+| [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); not implemented |
+| [ADR-0021](ADR-0021-lab-and-integration-validation.md) | Synthetic Kubernetes lab and evidence levels for integration validation | lab scope confirmed; technical design proposed (2026-09-27); not deployed |
 
 ## Adding a record
 
