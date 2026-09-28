@@ -4,7 +4,9 @@
 >
 > Turns a container vulnerability finding into a reproducible, auditable evidence record — without executing code inside the pod.
 
-**Status: PRE-ALPHA (design phase).** The repository contains the project specification and a first implementation slice: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing, covered by tests. The CLI, the input adapters and the evaluator do not exist yet; interfaces, schemas and command names described below are design targets, not shipped features.
+**Status: PRE-ALPHA.** The repository contains the project specification and a working offline core, covered by tests: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing; the strict `prisma-v1` CSV parser (`internal/ingest`, `internal/schema`); conservative normalization and identity resolution (`internal/normalize`, `internal/identity`); the canonical bundle projection (`internal/bundle`); the declarative offline evaluator with fail-closed pack admission (`internal/rulepack`, `internal/evaluator`); the deterministic JSON and HTML report renderer over an evaluation result (`internal/report`); the public wire specification `0.2` with synthetic vectors (`docs/spec/evidence-bundle/`); and synthetic fixtures with golden outputs. The CLI, the Kubernetes collector, report files written to disk, and the decision record do not exist yet; interfaces, schemas and command names described below are design targets, not shipped features, and no release is available.
+
+**Input compatibility today:** `prisma-v1` is an [Ariadne-defined CSV contract](docs/adr/ADR-0007-prisma-v1-schema-and-limits.md), not the header of a verified Prisma Cloud export. The parser rejects headers outside that contract. Direct import of native Prisma CSV or JSON is [planned](docs/adr/ADR-0020-prisma-acquisition-and-vulnerability-data.md), not implemented.
 
 ## The problem
 
@@ -29,7 +31,7 @@ Ariadne automates the **evidence preparation and evaluation** of that chain. The
 
 ## What it is
 
-- An offline CLI that ingests findings (CSV from Prisma Cloud or any other scanner) and sanitized `kubectl`/`oc` exports.
+- A planned offline CLI that ingests supported scanner findings and sanitized `kubectl`/`oc` exports.
 - A conservative identity resolver: CVE → package → digest → workload UID → container.
 - A deterministic evaluator: same evidence bundle + same rules = same result, byte for byte.
 - An exception record with owner, scope, validity window, and automatic invalidation when the evidence changes.
@@ -99,7 +101,7 @@ Core rules:
 | 0.2 | Optional read-only collector (namespace allowlist, scoped RBAC), fake API server tests, verified compatibility matrix per Kubernetes/OpenShift release |
 | 0.3 | Exception lifecycle: expiry, diff between runs, re-validation, OpenVEX/SARIF export |
 
-The public demo runs entirely on synthetic fixtures and requires no access to private infrastructure.
+The public demo is planned to run entirely on synthetic fixtures and will require no access to private infrastructure; today the repository ships synthetic fixtures with golden outputs and the public wire specification, not an executable demo.
 
 ## Documentation
 
