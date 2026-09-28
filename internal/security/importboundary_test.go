@@ -40,8 +40,16 @@ type boundaryDeclaration struct {
 	target string
 	dir    string
 	core   bool
+	strict bool
 	exact  []string
 	trees  []string
+	// graphExact and graphTrees narrow the transitive `go list -deps` pass when
+	// the standard library's own internals would trip a prohibition that is only
+	// meant for this project's sources: `os` needs `syscall` and `unsafe`, and
+	// treating the stdlib's implementation as a violation would be a false
+	// positive. The direct-import scan and the closure keep the full lists.
+	graphExact []string
+	graphTrees []string
 }
 
 // importBoundaries is the declared surface of the gate. A policy never comes
@@ -69,6 +77,20 @@ var importBoundaries = []boundaryDeclaration{
 		dir:    "internal/report",
 		trees:  []string{"os/exec"},
 	},
+	{
+		name:   "cli",
+		target: "../../cmd/ariadne",
+		dir:    "cmd/ariadne",
+		strict: true,
+		exact:  []string{"net", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:  []string{"net/http", "k8s.io/client-go"},
+		// The adapter legitimately reaches `os`, and `os` reaches its syscalls
+		// inside the standard library: the graph pass bans only what must never
+		// appear even transitively, while `unsafe`, `syscall` and `plugin` remain
+		// forbidden in the adapter's own sources and in the local closure.
+		graphExact: []string{"net", "os/exec", "plugin"},
+		graphTrees: []string{"net/http", "k8s.io/client-go"},
+	},
 }
 
 func TestImportBoundary(t *testing.T) {
@@ -86,8 +108,12 @@ func TestImportBoundary(t *testing.T) {
 			}
 			slices.Sort(deps)
 
+			graphExact, graphTrees := boundary.exact, boundary.trees
+			if boundary.graphExact != nil || boundary.graphTrees != nil {
+				graphExact, graphTrees = boundary.graphExact, boundary.graphTrees
+			}
 			for _, dep := range deps {
-				if banned := forbiddenMatch(dep, boundary.exact, boundary.trees); banned != "" {
+				if banned := forbiddenMatch(dep, graphExact, graphTrees); banned != "" {
 					t.Errorf("%s depends on %s, forbidden by the import boundary (%s)", importPath, dep, banned)
 				}
 			}
@@ -102,11 +128,12 @@ func TestImportBoundary(t *testing.T) {
 			// Makefile names selects this function, so a closure failure must
 			// fail here and not only in the analyzer's own cases.
 			closure := analyzeClosure(t, moduleRoot(t), closurePolicy{
-				name:  boundary.name,
-				dir:   boundary.dir,
-				core:  boundary.core,
-				exact: boundary.exact,
-				trees: boundary.trees,
+				name:   boundary.name,
+				dir:    boundary.dir,
+				core:   boundary.core,
+				strict: boundary.strict,
+				exact:  boundary.exact,
+				trees:  boundary.trees,
 			})
 			for _, finding := range closure {
 				t.Errorf("import closure: %s", finding)

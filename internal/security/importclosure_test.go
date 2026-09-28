@@ -32,11 +32,12 @@ import (
 // negative cases exercise this same function instead of a copy.
 
 type closurePolicy struct {
-	name  string
-	dir   string
-	core  bool
-	exact []string
-	trees []string
+	name   string
+	dir    string
+	core   bool
+	strict bool
+	exact  []string
+	trees  []string
 }
 
 // coreStdlibAllowlist is the only set of direct standard-library imports the
@@ -134,7 +135,7 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 		}
 		visited[dir] = true
 
-		if problem := nativeProblem(dir); problem != "" && policy.core {
+		if problem := nativeProblem(dir); problem != "" && (policy.core || policy.strict) {
 			findings = append(findings, closureFinding{chain: chain[dir], detail: problem})
 		}
 		sources, problems := parseProductionSources(dir)
@@ -147,7 +148,7 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 		}
 		for _, source := range sources {
 			location := chain[dir] + "/" + source.name
-			if policy.core {
+			if policy.core || policy.strict {
 				for _, directive := range source.directives {
 					findings = append(findings, closureFinding{chain: location, detail: "unsupported directive: " + directive})
 				}
