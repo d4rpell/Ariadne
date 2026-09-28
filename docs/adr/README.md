@@ -55,7 +55,7 @@ Two rules apply to every record:
 | [ADR-0019](ADR-0019-operating-modes-and-persistent-tracking.md) | Operating modes (occasional vs. tracking), temporal semantics, chart meaning, hot/warm/cold storage and external-policy export | proposed (2026-09-27); not implemented |
 | [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); not implemented |
 | [ADR-0021](ADR-0021-lab-and-integration-validation.md) | Synthetic Kubernetes lab and evidence levels for integration validation | lab scope confirmed; technical design proposed (2026-09-27); not deployed |
-| [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented (2026-09-28), pending acceptance review; distribution of reports not authorized |
+| [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented and accepted (2026-09-28); distribution of reports not authorized |
 
 ## Adding a record
 
