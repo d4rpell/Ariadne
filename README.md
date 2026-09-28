@@ -4,7 +4,7 @@
 >
 > Turns a container vulnerability finding into a reproducible, auditable evidence record — without executing code inside the pod.
 
-**Status: PRE-ALPHA.** The repository contains the project specification and a working offline core, covered by tests: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing; the strict `prisma-v1` CSV parser (`internal/ingest`, `internal/schema`); conservative normalization and identity resolution (`internal/normalize`, `internal/identity`); the canonical bundle projection (`internal/bundle`); the declarative offline evaluator with fail-closed pack admission (`internal/rulepack`, `internal/evaluator`); the deterministic JSON and HTML report renderer over an evaluation result (`internal/report`); the public wire specification `0.2` with synthetic vectors (`docs/spec/evidence-bundle/`); and synthetic fixtures with golden outputs. The CLI, the Kubernetes collector, report files written to disk, and the decision record do not exist yet; interfaces, schemas and command names described below are design targets, not shipped features, and no release is available.
+**Status: PRE-ALPHA.** The repository contains the project specification and a working offline core, covered by tests: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing; the strict `prisma-v1` CSV parser (`internal/ingest`, `internal/schema`); conservative normalization and identity resolution (`internal/normalize`, `internal/identity`); the canonical bundle projection (`internal/bundle`); the declarative offline evaluator with fail-closed pack admission (`internal/rulepack`, `internal/evaluator`); the deterministic JSON and HTML report renderer over an evaluation result (`internal/report`); the public wire specification `0.2` with synthetic vectors (`docs/spec/evidence-bundle/`); and synthetic fixtures with golden outputs. The offline CLI (`cmd/ariadne`) is also implemented and covered by tests — `evaluate`, `report` and `verify` over a canonical evidence bundle, with report files written through an explicit local-filesystem boundary ([ADR-0023](docs/adr/ADR-0023-offline-cli-and-replay-contract.md)). The Kubernetes collector, the deferred CLI subcommands (`import` and `normalize`; `diff` planned for 0.3) and the decision record do not exist yet; the remaining interfaces and command names described below are design targets, not shipped features, and no release is available.
 
 **Input compatibility today:** `prisma-v1` is an [Ariadne-defined CSV contract](docs/adr/ADR-0007-prisma-v1-schema-and-limits.md), not the header of a verified Prisma Cloud export. The parser rejects headers outside that contract. Direct import of native Prisma CSV or JSON is [planned](docs/adr/ADR-0020-prisma-acquisition-and-vulnerability-data.md), not implemented.
 
@@ -31,11 +31,11 @@ Ariadne automates the **evidence preparation and evaluation** of that chain. The
 
 ## What it is
 
-- A planned offline CLI that ingests supported scanner findings and sanitized `kubectl`/`oc` exports.
+- An offline CLI that evaluates a prepared evidence bundle and renders deterministic JSON/HTML reports; ingestion of supported scanner findings and sanitized `kubectl`/`oc` exports is planned.
 - A conservative identity resolver: CVE → package → digest → workload UID → container.
 - A deterministic evaluator: same evidence bundle + same rules = same result, byte for byte.
 - An exception record with owner, scope, validity window, and automatic invalidation when the evidence changes.
-- Report export (HTML/JSON) and, where the semantics hold, OpenVEX declarations and SARIF output.
+- Report export (HTML/JSON), available today through the offline CLI; OpenVEX declarations and SARIF output are planned for 0.3.
 
 ## What it is not
 
