@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ariadne evaluation report</title>
+<style>
+body{font-family:system-ui,sans-serif;line-height:1.45;margin:2rem;max-width:80rem}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.8rem}h3{font-size:1rem;margin-top:1.2rem}
+table{border-collapse:collapse;margin:0.6rem 0}th,td{border:1px solid #999;padding:0.25rem 0.5rem;text-align:left;vertical-align:top}
+code{font-family:ui-monospace,monospace}
+.pre-alpha{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
+.limits li{margin:0.2rem 0}
+</style>
+</head>
+<body>
+<h1>Ariadne evaluation report</h1>
+<p class="pre-alpha">Pre-alpha presentation of one evaluation result. It is not a risk acceptance, not an approval and not a security statement. This document reproduces what the evaluator computed; it adds no conclusion.</p>
+
+<h2>Evaluation identity</h2>
+<table>
+<tr><th>Engine version</th><td><code>0.1.0</code></td></tr>
+<tr><th>Profile</th><td><code>product-evidence-v1</code></td></tr>
+<tr><th>Bundle hash</th><td><code>sha256:37e7a55d6b3f2b5511995bbf1ef6d0c6d4c60ecd1f4cf851448beb8ae1489aff</code></td></tr>
+<tr><th>Pack</th><td><code>pack.fixtures</code> version 1, hash <code>sha256:492d5d023c5180e1cd2073b2f2abf25ba944134c6b9c343e559005cd68a276d1</code></td></tr>
+</table>
+
+<h2>Decision layers</h2>
+<p>The three layers are separate. A technical status is not an exploitability assessment and neither of them is a risk decision.</p>
+<table>
+<tr><th>Product status (technical)</th><td><code>under_investigation</code></td></tr>
+<tr><th>Exploitability (local profile, not a VEX field)</th><td><code>not_assessed</code></td></tr>
+<tr><th>Risk decision (human governance)</th><td>No human risk decision is present in this evaluator result.</td></tr>
+</table>
+
+<h2>Target</h2>
+<table>
+<tr><th>Subject UID</th><td><code>uid-F09</code></td></tr>
+<tr><th>Container</th><td><code>regular</code> / <code>app</code></td></tr>
+<tr><th>Vulnerability</th><td><code>CVE-2026-9001</code></td></tr>
+<tr><th>Row reference</th><td><code>findings.csv</code>, locator <code>record/1/bytes/196-351</code>, source hash <code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code>, observed at <code>2026-09-20T10:00:00Z</code></td></tr>
+</table>
+
+<h2>Global reasons</h2>
+<ul><li><code>domain_source_unapproved</code></li><li><code>requirements_missing</code></li></ul>
+
+<h2>Candidates</h2>
+<p>Each candidate is a branch the evaluation sustained, not a selected final decision. Several may coexist while the global status stays inconclusive.</p>
+<p>No affirmative candidate is present in this result (explicit empty array).</p>
+
+<h2>Rule traces</h2>
+<h3><code>rule.affected</code> — <code>missing_evidence</code></h3>
+<p>Missing requirements: <code>domain.artifact</code> <code>domain.mapping</code> <code>domain.vendor_proof</code> </p>
+<p>Reasons: <code>missing</code> <code>unapproved_source</code> <code>verified</code> </p>
+<p>Rule evidence references: <a href="#e-0"><code>item_index 0</code></a> <a href="#e-0"><code>item_index 0</code></a> <a href="#e-4"><code>item_index 1</code></a> <a href="#e-4"><code>item_index 1</code></a> <a href="#e-8"><code>item_index 2</code></a> <a href="#e-10"><code>item_index 3</code></a> <a href="#e-12"><code>item_index 11</code></a> <a href="#e-14"><code>item_index 12</code></a> <a href="#e-16"><code>item_index 13</code></a> <a href="#e-18"><code>item_index 19</code></a> </p>
+<p>No check ran for this rule (empty array).</p>
+
+
+<h2>Global evidence references</h2>
+<p>The declared order is the one the result fixed; the catalog below is ordered by item index.</p>
+<ul><li><a href="#e-0"><code>item_index 0</code></a></li><li><a href="#e-0"><code>item_index 0</code></a></li><li><a href="#e-4"><code>item_index 1</code></a></li><li><a href="#e-4"><code>item_index 1</code></a></li><li><a href="#e-8"><code>item_index 2</code></a></li><li><a href="#e-10"><code>item_index 3</code></a></li><li><a href="#e-12"><code>item_index 11</code></a></li><li><a href="#e-14"><code>item_index 12</code></a></li><li><a href="#e-16"><code>item_index 13</code></a></li><li><a href="#e-18"><code>item_index 19</code></a></li><li><a href="#e-20"><code>item_index 20</code></a></li><li><a href="#e-21"><code>item_index 21</code></a></li><li><a href="#e-22"><code>item_index 22</code></a></li><li><a href="#e-23"><code>item_index 23</code></a></li><li><a href="#e-24"><code>item_index 24</code></a></li><li><a href="#e-25"><code>item_index 25</code></a></li><li><a href="#e-26"><code>item_index 26</code></a></li><li><a href="#e-27"><code>item_index 27</code></a></li><li><a href="#e-28"><code>item_index 28</code></a></li><li><a href="#e-29"><code>item_index 29</code></a></li><li><a href="#e-30"><code>item_index 30</code></a></li><li><a href="#e-31"><code>item_index 31</code></a></li><li><a href="#e-32"><code>item_index 32</code></a></li><li><a href="#e-33"><code>item_index 33</code></a></li><li><a href="#e-34"><code>item_index 34</code></a></li></ul>
+
+<h2>Global warning references</h2>
+<p>The declared order is the one the result fixed; the catalog below is ordered by the ratified tuple.</p>
+<p>None (explicit empty array).</p>
+
+<h2>Evidence catalog</h2>
+<p>Every row is a citation of the canonical bundle named by the bundle hash above, in the order the contract fixes, with every duplicate occurrence preserved. Values are not reproduced here; consult the referenced evidence bundle under its access policy.</p>
+<table>
+<tr><th>Row</th><th>item_index</th><th>Type</th><th>Source</th><th>Source hash</th><th>Locator</th><th>Observed at</th><th>Confidence</th><th>Scope</th></tr>
+<tr id="e-0"><td><code>e-0</code></td><td><code>0</code></td><td><code>container_status.image_id</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-1"><td><code>e-1</code></td><td><code>0</code></td><td><code>container_status.image_id</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-2"><td><code>e-2</code></td><td><code>0</code></td><td><code>container_status.image_id</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-3"><td><code>e-3</code></td><td><code>0</code></td><td><code>container_status.image_id</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-4"><td><code>e-4</code></td><td><code>1</code></td><td><code>container_status.normalized_digest</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>derived</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-5"><td><code>e-5</code></td><td><code>1</code></td><td><code>container_status.normalized_digest</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>derived</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-6"><td><code>e-6</code></td><td><code>1</code></td><td><code>container_status.normalized_digest</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>derived</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-7"><td><code>e-7</code></td><td><code>1</code></td><td><code>container_status.normalized_digest</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>derived</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-8"><td><code>e-8</code></td><td><code>2</code></td><td><code>container_status.platform.architecture</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-9"><td><code>e-9</code></td><td><code>2</code></td><td><code>container_status.platform.architecture</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-10"><td><code>e-10</code></td><td><code>3</code></td><td><code>container_status.platform.os</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-11"><td><code>e-11</code></td><td><code>3</code></td><td><code>container_status.platform.os</code></td><td><code>pods.json</code></td><td><code>sha256:0797267dfffabc172dfaf53836356751bd26385a0d7ba48dedbbb3760e77c11e</code></td><td><code>items[0].status.containerStatuses[0].imageID</code></td><td><code>2026-09-20T10:05:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-12"><td><code>e-12</code></td><td><code>11</code></td><td><code>prisma_v1.package_id</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-13"><td><code>e-13</code></td><td><code>11</code></td><td><code>prisma_v1.package_id</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-14"><td><code>e-14</code></td><td><code>12</code></td><td><code>prisma_v1.package_name</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-15"><td><code>e-15</code></td><td><code>12</code></td><td><code>prisma_v1.package_name</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-16"><td><code>e-16</code></td><td><code>13</code></td><td><code>prisma_v1.package_type</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-17"><td><code>e-17</code></td><td><code>13</code></td><td><code>prisma_v1.package_type</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-18"><td><code>e-18</code></td><td><code>19</code></td><td><code>prisma_v1.vulnerability_id</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-19"><td><code>e-19</code></td><td><code>19</code></td><td><code>prisma_v1.vulnerability_id</code></td><td><code>findings.csv</code></td><td><code>sha256:024b4bca74ef0c947c04c99b292dba7d09f7fe4349f883ce47a57c2f61d0548f</code></td><td><code>record/1/bytes/196-351</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-20"><td><code>e-20</code></td><td><code>20</code></td><td><code>product_v1.artifact.architecture</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-21"><td><code>e-21</code></td><td><code>21</code></td><td><code>product_v1.artifact.artifact_digest</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-22"><td><code>e-22</code></td><td><code>22</code></td><td><code>product_v1.artifact.component_id</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-23"><td><code>e-23</code></td><td><code>23</code></td><td><code>product_v1.artifact.coverage</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-24"><td><code>e-24</code></td><td><code>24</code></td><td><code>product_v1.artifact.digest_kind</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-25"><td><code>e-25</code></td><td><code>25</code></td><td><code>product_v1.artifact.epoch</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-26"><td><code>e-26</code></td><td><code>26</code></td><td><code>product_v1.artifact.method</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-27"><td><code>e-27</code></td><td><code>27</code></td><td><code>product_v1.artifact.os</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-28"><td><code>e-28</code></td><td><code>28</code></td><td><code>product_v1.artifact.package_arch</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-29"><td><code>e-29</code></td><td><code>29</code></td><td><code>product_v1.artifact.package_name</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-30"><td><code>e-30</code></td><td><code>30</code></td><td><code>product_v1.artifact.package_release</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-31"><td><code>e-31</code></td><td><code>31</code></td><td><code>product_v1.artifact.product_id</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-32"><td><code>e-32</code></td><td><code>32</code></td><td><code>product_v1.artifact.product_release</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-33"><td><code>e-33</code></td><td><code>33</code></td><td><code>product_v1.artifact.vendor</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+<tr id="e-34"><td><code>e-34</code></td><td><code>34</code></td><td><code>product_v1.artifact.version</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>records/artifact/0</code></td><td><code>2026-09-20T10:00:00Z</code></td><td><code>observed</code></td><td><code>uid-F09</code> / <code>app</code></td></tr>
+</table>
+
+<h2>Warning catalog</h2>
+<p>Every row is one warning occurrence, in the ratified order (origin, evidence_index, warning_index). Warning message omitted; consult the referenced evidence bundle under its access policy.</p>
+<p>No warning is referenced by this result (explicit empty array).</p>
+
+
+<h2>Replay context</h2>
+<p>The evaluation instant below is the replay parameter the caller supplied. It is not an issuance date, not a validity period and not a statement that the evidence is current.</p>
+<table>
+<tr><th>Evaluated at (replay parameter)</th><td><code>2026-10-01T12:00:00Z</code></td></tr>
+<tr><th>Expected pack id</th><td><code>pack.fixtures</code></td></tr>
+<tr><th>Expected pack hash</th><td><code>sha256:492d5d023c5180e1cd2073b2f2abf25ba944134c6b9c343e559005cd68a276d1</code></td></tr>
+<tr><th>Minimum version</th><td><code>1</code></td></tr>
+<tr><th>Previously admitted</th><td>null</td></tr>
+<tr><th>Domain context</th><td>maximum evidence age <code>2592000</code> seconds</td></tr>
+</table>
+<table>
+<tr><th>Role</th><th>Source</th><th>Source hash</th><th>advisory_id</th><th>advisory_revision</th></tr>
+<tr><td><code>artifact</code></td><td><code>inspection.json</code></td><td><code>sha256:e0b1ab4388a19d75579b6249673a49f1ce3240d1126fba8f2fe1dff59bd8592f</code></td><td><code>null</code></td><td><code>null</code></td></tr>
+</table>
+
+<h2>Limits of this report</h2>
+<ul class="limits">
+<li>The bundle hash proves integrity of those bytes. It does not authenticate the origin or the cluster, and it does not prove that the sources are sufficient, exhaustive or current.</li>
+<li>This presentation is not a second evaluator. Re-evaluating the semantics of a fabricated result is out of scope, so form validation does not establish that the evaluation was sound.</li>
+<li>There is no universal secret detector. Identifiers and citations are included under the responsibility of the producer and the caller who holds the case, and distribution of reports is not authorized by this contract.</li>
+<li>Nothing here is safe, approved, risk-free or valid by implication, and no spreadsheet-import protection is claimed.</li>
+</ul>
+</body>
+</html>
