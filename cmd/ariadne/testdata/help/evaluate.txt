@@ -1,0 +1,2 @@
+Usage: ariadne evaluate --bundle PATH --bundle-hash H --pack PATH --context PATH
+Pre-alpha. Offline. Report distribution is not authorized.

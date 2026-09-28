@@ -1,0 +1,2 @@
+Usage: ariadne report --bundle PATH --bundle-hash H --pack PATH --context PATH --format json|html --out PATH
+Pre-alpha. Offline. Report distribution is not authorized.
