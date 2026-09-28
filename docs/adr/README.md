@@ -56,7 +56,7 @@ Two rules apply to every record:
 | [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); native deployed-image CSV and JSON offline before API selected (2026-09-28); not implemented |
 | [ADR-0021](ADR-0021-lab-and-integration-validation.md) | Synthetic Kubernetes lab and evidence levels for integration validation | lab scope confirmed; technical design proposed (2026-09-27); not deployed |
 | [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented and accepted (2026-09-28); distribution of reports not authorized |
-| [ADR-0023](ADR-0023-offline-cli-and-replay-contract.md) | Offline CLI subset, explicit IO, deterministic replay and test contract | ratified and accepted by the owner (2026-09-28); transport bounds and filesystem policy resolved; implemented (2026-09-28), pending acceptance review; distribution of reports not authorized |
+| [ADR-0023](ADR-0023-offline-cli-and-replay-contract.md) | Offline CLI subset, explicit IO, deterministic replay and test contract | ratified and accepted by the owner (2026-09-28); transport bounds and filesystem policy resolved; implemented and independently reviewed with no open finding (2026-09-28); task accepted by the owner (2026-09-28); distribution of reports and release not authorized |
 
 ## Adding a record
 
