@@ -53,7 +53,7 @@ Two rules apply to every record:
 | [ADR-0017](ADR-0017-optional-governance-platform-and-timeline.md) | Optional governance platform, private-image evidence and append-only timeline | ratified (2026-09-26); not implemented |
 | [ADR-0018](ADR-0018-domain-context-and-profile-recognition.md) | Domain context combinations and bounded profile recognition | accepted under delegated authority (2026-09-26); implemented (2026-09-27), pending acceptance review |
 | [ADR-0019](ADR-0019-operating-modes-and-persistent-tracking.md) | Operating modes (occasional vs. tracking), temporal semantics, chart meaning, hot/warm/cold storage and external-policy export | proposed (2026-09-27); not implemented |
-| [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); not implemented |
+| [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); native deployed-image CSV and JSON offline before API selected (2026-09-28); not implemented |
 | [ADR-0021](ADR-0021-lab-and-integration-validation.md) | Synthetic Kubernetes lab and evidence levels for integration validation | lab scope confirmed; technical design proposed (2026-09-27); not deployed |
 | [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented and accepted (2026-09-28); distribution of reports not authorized |
 
