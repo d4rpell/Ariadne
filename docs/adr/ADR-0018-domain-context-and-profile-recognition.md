@@ -1,9 +1,9 @@
 # ADR-0018: Domain context and profile recognition
 
-- **Status**: **accepted under authority delegated by the project owner, 2026-09-26**. The domain context limits and the bounded profile recognition exist in the repository since 2026-09-27 (`internal/evaluator`, `internal/rulepack`), pending the closing independent review and the owner's acceptance of the task. Nothing is distributed or released; Ariadne remains pre-alpha. This decision alone does not authorize implementation or distribution.
+- **Status**: **accepted under authority delegated by the project owner, 2026-09-26; implemented and accepted by the owner on 2026-09-27**. The domain context limits and the bounded profile recognition exist in the repository (`internal/evaluator`, `internal/rulepack`). Nothing is distributed or released; Ariadne remains pre-alpha. This decision alone does not authorize distribution.
 - **Decision owner**: project owner (delegated decision on this point).
 - **Related records**: extends the previously unspecified context combinations of ADR-0015 and replaces its pending proposal on those combinations; preserves ADR-0013 error meanings and admission order, ADR-0016, and the corrected rule that pack hash verification precedes schema admission. Recorded under ADR-0011. No successor is recorded.
-- **Independent review**: pending. The proposal and the design review of the execution plan come from the same session, so this record is not yet independently reviewed.
+- **Independent review**: closed before owner acceptance on 2026-09-27. The proposal and the design review of the execution plan came from the same session; that historical limitation was resolved by the closing independent review.
 
 ## Decision
 

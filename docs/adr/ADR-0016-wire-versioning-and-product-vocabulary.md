@@ -1,6 +1,6 @@
 # ADR-0016 — Wire versioning and product vocabulary
 
-- **Status**: **ratified by the owner on 2026-09-26**. `0.2` is emitted and accepted by the repository since 2026-09-27 (`pkg/evidence`, `internal/bundle`, `internal/rulepack`, `internal/evaluator`), pending the closing independent review and the owner's acceptance of the task; the frozen `0.1` vectors stay frozen. Nothing is activated, distributed or released, and Ariadne remains pre-alpha. This record alone does not authorize activation, distribution, commits or pushes.
+- **Status**: **ratified by the owner on 2026-09-26; implemented and accepted by the owner on 2026-09-27**. `0.2` is emitted and accepted by the repository (`pkg/evidence`, `internal/bundle`, `internal/rulepack`, `internal/evaluator`); the frozen `0.1` vectors stay frozen. Nothing is activated, distributed or released, and Ariadne remains pre-alpha. This record alone does not authorize activation, distribution, commits or pushes.
 - **Decision owner**: project owner.
 - **Independent review**: the record was reviewed before ratification; the review found no blocking findings and the corrections it requested are applied.
 - **Emission policy**: general `0.2` emission, selected by the owner on 2026-09-26 and ratified with this record.

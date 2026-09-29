@@ -1,6 +1,6 @@
 # ADR-0013: Initial offline evaluator contract
 
-- **Status:** **ratified by the owner on 2026-09-26** and **implemented** as the initial conservative profile of the offline evaluator. The independent review of that implementation is still in progress, so the decision is ratified while its acceptance is pending.
+- **Status:** **ratified by the owner on 2026-09-26; implemented and accepted by the owner on 2026-09-27** as the initial conservative profile of the offline evaluator. Ariadne remains pre-alpha; this status does not authorize distribution or release.
 - **Related records:** depends on ADR-0003, ADR-0004, ADR-0006, ADR-0010, ADR-0011 and ADR-0012; paired with the ratified ADR-0014. No accepted record is superseded.
 - **Reading this record:** the sections below are the text that was ratified, written while the decision was still a proposal; a sentence in the proposal tense describes what was decided, not pending work. The superseded state lines were: "the earlier state line said the record was proposed and awaiting ratification, and that the evaluator and pack admission were not implemented. Both statements described the proposal stage and are superseded by the status line above. The sections below keep their original wording as the record of what was decided."
 

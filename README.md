@@ -65,9 +65,9 @@ Three components with separated trust and privilege:
 
 | Component | Responsibility | Privilege |
 |---|---|---|
-| Collector | Observe and record facts | Read-only (`get`/`list` on allowlisted resources) |
+| Collector (planned) | Observe and record facts | Planned boundary: read-only (`get`/`list` on allowlisted resources) |
 | Evaluator | Apply declarative rules offline | None: no network, no shell, no cluster client |
-| Case record | Record human decisions and validity | None: append-only local store |
+| Case record (planned) | Record human decisions and validity | Planned boundary: append-only local store |
 
 ## Evidence model
 
@@ -87,9 +87,9 @@ Core rules:
 
 ## Security posture
 
-- Offline and air-gap friendly: no telemetry, no callbacks, no external feeds required.
-- No Secrets, logs, env values or ConfigMap data are read or persisted.
-- Redaction happens before anything is written to disk.
+- The current CLI consumes caller-provided, prepared canonical evidence bundles; it does not acquire scanner or cluster sources.
+- The future collector contract excludes Secrets, logs, environment values and ConfigMap data from acquisition and persistence.
+- Pre-persistence redaction is a future collector requirement. Ariadne is not a general sanitizer or secret detector.
 - Rule packs are declarative and content-hashed; the evaluator cannot execute code or reach the network, enforced by a CI import check.
 - No cost, performance or security guarantee is claimed without reproducible evidence.
 

@@ -10,6 +10,8 @@ It exists for three audiences:
 
 **Ariadne is pre-alpha.** These records document the decisions taken; they are not a description of shipped functionality. Where a decision concerns something that does not exist yet, the record says so explicitly, and a decision that *reduces* what the tool claims is recorded here just like any other.
 
+Records retain dated rationale and implementation snapshots. A historical statement that a capability was absent or acceptance was pending (including older records such as ADR-0002 and ADR-0003) describes that record's stage unless a later dated status line supersedes it. The root README states the current shipped scope.
+
 ## How to read a record
 
 Each record follows the same template:
@@ -46,17 +48,18 @@ Two rules apply to every record:
 | [ADR-0010](ADR-0010-provenance-scope-and-digest-class.md) | Provenance boundary, container scope collision, digest class | accepted (2026-09-25) |
 | [ADR-0011](ADR-0011-decision-record-policy.md) | Two-layer decision record: what, alternatives, why, limits, revisit conditions | accepted (2026-09-25) |
 | [ADR-0012](ADR-0012-evidence-bundle-integration-precisions.md) | Evidence item mapping, value-hash preimage, source hash and omission semantics | accepted (2026-09-26) |
-| [ADR-0013](ADR-0013-offline-evaluator-contract.md) | Conservative evaluator profile, pack admission and reproducibility | ratified (2026-09-26); implemented, pending acceptance review |
-| [ADR-0014](ADR-0014-static-import-closure.md) | Static closure of local production imports | ratified (2026-09-26); implemented, pending acceptance review |
-| [ADR-0015](ADR-0015-domain-contract-and-affirmative-evaluation.md) | Domain contract and affirmative product evaluation: profile, evidence families, conflict policy | ratified (2026-09-26); implemented (2026-09-27), pending acceptance review |
-| [ADR-0016](ADR-0016-wire-versioning-and-product-vocabulary.md) | Wire versioning to `0.2` for the product vocabulary, digest-class claim and emission policy | ratified (2026-09-26); implemented (2026-09-27), pending acceptance review |
+| [ADR-0013](ADR-0013-offline-evaluator-contract.md) | Conservative evaluator profile, pack admission and reproducibility | ratified (2026-09-26); implemented and accepted by owner (2026-09-27) |
+| [ADR-0014](ADR-0014-static-import-closure.md) | Static closure of local production imports | ratified (2026-09-26); implemented and accepted by owner (2026-09-27) |
+| [ADR-0015](ADR-0015-domain-contract-and-affirmative-evaluation.md) | Domain contract and affirmative product evaluation: profile, evidence families, conflict policy | ratified (2026-09-26); implemented and accepted by owner (2026-09-27) |
+| [ADR-0016](ADR-0016-wire-versioning-and-product-vocabulary.md) | Wire versioning to `0.2` for the product vocabulary, digest-class claim and emission policy | ratified (2026-09-26); implemented and accepted by owner (2026-09-27) |
 | [ADR-0017](ADR-0017-optional-governance-platform-and-timeline.md) | Optional governance platform, private-image evidence and append-only timeline | ratified (2026-09-26); not implemented |
-| [ADR-0018](ADR-0018-domain-context-and-profile-recognition.md) | Domain context combinations and bounded profile recognition | accepted under delegated authority (2026-09-26); implemented (2026-09-27), pending acceptance review |
+| [ADR-0018](ADR-0018-domain-context-and-profile-recognition.md) | Domain context combinations and bounded profile recognition | accepted under delegated authority (2026-09-26); implemented and accepted by owner (2026-09-27) |
 | [ADR-0019](ADR-0019-operating-modes-and-persistent-tracking.md) | Operating modes (occasional vs. tracking), temporal semantics, chart meaning, hot/warm/cold storage and external-policy export | proposed (2026-09-27); not implemented |
 | [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) | Optional Prisma Compute acquisition, richer vulnerability data and CVSS provenance, with the evaluator kept offline | proposed (2026-09-27); native deployed-image CSV and JSON offline before API selected (2026-09-28); not implemented |
 | [ADR-0021](ADR-0021-lab-and-integration-validation.md) | Synthetic Kubernetes lab and evidence levels for integration validation | lab scope confirmed; technical design proposed (2026-09-27); not deployed |
 | [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented and accepted (2026-09-28); distribution of reports not authorized |
 | [ADR-0023](ADR-0023-offline-cli-and-replay-contract.md) | Offline CLI subset, explicit IO, deterministic replay and test contract | ratified and accepted by the owner (2026-09-28); transport bounds and filesystem policy resolved; implemented and independently reviewed with no open finding (2026-09-28); task accepted by the owner (2026-09-28); distribution of reports and release not authorized |
+| [ADR-0024](ADR-0024-public-repository-visibility.md) | Public repository visibility | accepted (2026-09-29); visibility verified separately |
 
 ## Adding a record
 

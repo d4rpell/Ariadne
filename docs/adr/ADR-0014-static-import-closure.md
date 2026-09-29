@@ -1,6 +1,6 @@
 # ADR-0014: Static closure of local imports
 
-- **Status:** **ratified by the owner on 2026-09-26** and **implemented** as the import-boundary closure of the reviewed test suite. The independent review of that implementation is still in progress, so the decision is ratified while its acceptance is pending.
+- **Status:** **ratified by the owner on 2026-09-26; implemented and accepted by the owner on 2026-09-27** as the import-boundary closure of the reviewed test suite. Ariadne remains pre-alpha; this status does not authorize distribution or release.
 - **Related records:** develops the offline isolation requirements of ADR-0003 and ADR-0004, follows ADR-0011, and supports the ratified ADR-0013. No accepted record is superseded.
 - **Reading this record:** the sections below are the text that was ratified, written while the decision was still a proposal; a sentence in the proposal tense describes what was decided, not pending work. The superseded state lines were: "the earlier state line said the record was proposed and that the closure was not implemented. Both statements described the proposal stage and are superseded by the status line above. The sections below keep their original wording as the record of what was decided."
 
