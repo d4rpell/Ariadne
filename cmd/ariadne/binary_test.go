@@ -88,6 +88,17 @@ var requiredScenarios = map[string]bool{
 	"report-determinism/f13-html": true,
 	"replay/cross-bundle":         true,
 	"watchdog/timeout":            true,
+
+	"determinism/evaluate-receipt-across-environments": true,
+	"determinism/verify-across-environments":           true,
+	"determinism/report-json-across-environments":      true,
+	"determinism/report-html-across-environments":      true,
+	"effects/invalid-input-creates-nothing":            true,
+	"effects/existing-destination-intact":              true,
+	"effects/report-is-silent":                         true,
+	"effects/evaluate-and-verify-create-nothing":       true,
+	"limits/context-under-limit":                       true,
+	"limits/context-over-limit":                        true,
 }
 
 const (
