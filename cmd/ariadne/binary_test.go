@@ -99,6 +99,10 @@ var requiredScenarios = map[string]bool{
 	"effects/evaluate-and-verify-create-nothing":       true,
 	"limits/context-under-limit":                       true,
 	"limits/context-over-limit":                        true,
+
+	"example/contexts":        true,
+	"example/receipts":        true,
+	"example/report-f09-html": true,
 }
 
 const (

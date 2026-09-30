@@ -369,7 +369,7 @@ func TestA108HarnessInventory(t *testing.T) {
 			}
 			families[parts[0]]++
 		}
-		for _, family := range []string{"help", "error", "receipt", "verify", "report-parity", "fixture", "report-determinism", "replay", "watchdog", "determinism", "effects"} {
+		for _, family := range []string{"help", "error", "receipt", "verify", "report-parity", "fixture", "report-determinism", "replay", "watchdog", "determinism", "effects", "example"} {
 			if families[family] == 0 {
 				t.Fatalf("the family %q has no scenarios: the inventory lost coverage", family)
 			}

@@ -29,6 +29,32 @@ func composeFixture(t *testing.T, slug string) fixturePaths {
 	input := filepath.Join(root, "input")
 	expected := filepath.Join(root, "expected")
 
+	contextBytes := composedContextBytes(t, slug)
+	dir := t.TempDir()
+	contextPath := filepath.Join(dir, "context.json")
+	if err := os.WriteFile(contextPath, contextBytes, 0o600); err != nil {
+		t.Fatalf("write context: %v", err)
+	}
+	hashBytes, err := os.ReadFile(filepath.Join(expected, "bundle.sha256"))
+	if err != nil {
+		t.Fatalf("fixture read %s: %v", filepath.Join(expected, "bundle.sha256"), err)
+	}
+	return fixturePaths{
+		bundle:     filepath.Join(input, "bundle.json"),
+		bundleHash: string(trimSpace(hashBytes)),
+		pack:       filepath.Join(input, "pack.json"),
+		context:    contextPath,
+	}
+}
+
+// composedContextBytes composes the one CLI context document (ADR-0023 §4.2:
+// target + admission + domain) from the fixture inputs, materializing the
+// optional members the fixture files omit as explicit nulls. The example under
+// examples/synthetic-case/ ships exactly these bytes.
+func composedContextBytes(t *testing.T, slug string) []byte {
+	t.Helper()
+	input := filepath.Join(fixturesRoot, slug, "0.2", "input")
+
 	read := func(path string) []byte {
 		t.Helper()
 		data, err := os.ReadFile(path)
@@ -78,18 +104,7 @@ func composeFixture(t *testing.T, slug string) fixturePaths {
 	if err != nil {
 		t.Fatalf("compose context: %v", err)
 	}
-
-	dir := t.TempDir()
-	contextPath := filepath.Join(dir, "context.json")
-	if err := os.WriteFile(contextPath, contextBytes, 0o600); err != nil {
-		t.Fatalf("write context: %v", err)
-	}
-	return fixturePaths{
-		bundle:     filepath.Join(input, "bundle.json"),
-		bundleHash: string(trimSpace(read(filepath.Join(expected, "bundle.sha256")))),
-		pack:       filepath.Join(input, "pack.json"),
-		context:    contextPath,
-	}
+	return contextBytes
 }
 
 func trimSpace(data []byte) []byte {
