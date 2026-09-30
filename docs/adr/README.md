@@ -60,6 +60,7 @@ Two rules apply to every record:
 | [ADR-0022](ADR-0022-json-and-html-report-contract.md) | JSON and HTML report contract: result-derived core plus bundle-verified evidence and warning catalogues | ratified by delegated authority (2026-09-28); implemented and accepted (2026-09-28); distribution of reports not authorized |
 | [ADR-0023](ADR-0023-offline-cli-and-replay-contract.md) | Offline CLI subset, explicit IO, deterministic replay and test contract | ratified and accepted by the owner (2026-09-28); transport bounds and filesystem policy resolved; implemented and independently reviewed with no open finding (2026-09-28); task accepted by the owner (2026-09-28); distribution of reports and release not authorized |
 | [ADR-0024](ADR-0024-public-repository-visibility.md) | Public repository visibility | accepted (2026-09-29); visibility verified separately |
+| [ADR-0025](ADR-0025-sanitized-podlist-ingestion.md) | Offline ingestion of sanitized PodList exports: closed `sanitized-podlist-v1/1.0` profile, allowlist rejection, explicit coverage and termination | ratified by the owner (2026-09-30) after independent review closed with no open finding; not implemented; implementation requires separate authorization |
 
 ## Adding a record
 
