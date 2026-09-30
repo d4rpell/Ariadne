@@ -91,6 +91,60 @@ var importBoundaries = []boundaryDeclaration{
 		graphExact: []string{"net", "os/exec", "plugin"},
 		graphTrees: []string{"net/http", "k8s.io/client-go"},
 	},
+	// Sanitized PodList adapter roots (ADR-0025 A.11.3). The profile must not
+	// reach network, shell, filesystem, process execution or cluster clients,
+	// directly or through a local intermediate package. `os` is forbidden
+	// exactly in the sources themselves and in the closure; the graph pass
+	// cannot ban it because the standard library's own `fmt` reaches it.
+	{
+		name:       "ingest",
+		target:     "../ingest",
+		dir:        "internal/ingest",
+		strict:     true,
+		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:      []string{"net/http", "k8s.io/client-go"},
+		graphExact: []string{"net", "os/exec", "plugin"},
+		graphTrees: []string{"net/http", "k8s.io/client-go"},
+	},
+	{
+		name:       "normalize",
+		target:     "../normalize",
+		dir:        "internal/normalize",
+		strict:     true,
+		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:      []string{"net/http", "k8s.io/client-go"},
+		graphExact: []string{"net", "os/exec", "plugin"},
+		graphTrees: []string{"net/http", "k8s.io/client-go"},
+	},
+	{
+		name:       "identity",
+		target:     "../identity",
+		dir:        "internal/identity",
+		strict:     true,
+		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:      []string{"net/http", "k8s.io/client-go"},
+		graphExact: []string{"net", "os/exec", "plugin"},
+		graphTrees: []string{"net/http", "k8s.io/client-go"},
+	},
+	{
+		name:       "bundle",
+		target:     "../bundle",
+		dir:        "internal/bundle",
+		strict:     true,
+		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:      []string{"net/http", "k8s.io/client-go"},
+		graphExact: []string{"net", "os/exec", "plugin"},
+		graphTrees: []string{"net/http", "k8s.io/client-go"},
+	},
+}
+
+// adapterRoots are the boundary names whose closure uses the independent
+// adapter allowlist of ADR-0025 A.11.3 instead of the core allowlist.
+var adapterRoots = map[string]bool{
+	"ingest":    true,
+	"normalize": true,
+	"identity":  true,
+	"bundle":    true,
 }
 
 func TestImportBoundary(t *testing.T) {
@@ -128,12 +182,13 @@ func TestImportBoundary(t *testing.T) {
 			// Makefile names selects this function, so a closure failure must
 			// fail here and not only in the analyzer's own cases.
 			closure := analyzeClosure(t, moduleRoot(t), closurePolicy{
-				name:   boundary.name,
-				dir:    boundary.dir,
-				core:   boundary.core,
-				strict: boundary.strict,
-				exact:  boundary.exact,
-				trees:  boundary.trees,
+				name:      boundary.name,
+				dir:       boundary.dir,
+				core:      boundary.core,
+				strict:    boundary.strict,
+				exact:     boundary.exact,
+				trees:     boundary.trees,
+				allowlist: allowlistFor(boundary),
 			})
 			for _, finding := range closure {
 				t.Errorf("import closure: %s", finding)
@@ -153,6 +208,16 @@ func forbiddenMatch(path string, exact, trees []string) string {
 	}
 
 	return ""
+}
+
+// allowlistFor selects the stdlib policy of one boundary: the adapter roots use
+// the independent list of ADR-0025 A.11.3, every other boundary keeps the core
+// policy of ADR-0014.
+func allowlistFor(boundary boundaryDeclaration) []string {
+	if adapterRoots[boundary.name] {
+		return adapterStdlibAllowlist
+	}
+	return nil
 }
 
 type directImport struct {

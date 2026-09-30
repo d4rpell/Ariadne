@@ -264,7 +264,7 @@ func TestNormalizeRejectsUnusableBindings(t *testing.T) {
 		}},
 		"unsupported input kind": {bindingFor(0, func() identity.ImageBinding {
 			binding := syntheticBinding("api")
-			binding.InputKind = identity.InputContainerObservation
+			binding.InputKind = identity.InputKind("scanner_csv")
 			binding.GuaranteedDigest = guaranteedDigest(t, "sha256:"+strings.Repeat("ab", 32))
 			return binding
 		}())},

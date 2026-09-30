@@ -108,9 +108,8 @@ func TestResolveOneRefusesMalformedKey(t *testing.T) {
 
 func TestResolveOneRefusesUnsupportedInputKind(t *testing.T) {
 	cases := map[string]InputKind{
-		"empty":                 "",
-		"container observation": InputContainerObservation,
-		"unknown":               "scanner_csv",
+		"empty":   "",
+		"unknown": "scanner_csv",
 	}
 	for name, kind := range cases {
 		binding := syntheticBinding("api")

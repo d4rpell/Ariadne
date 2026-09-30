@@ -38,7 +38,19 @@ type closurePolicy struct {
 	strict bool
 	exact  []string
 	trees  []string
+	// allowlist, when non-nil, replaces coreStdlibAllowlist for this policy. The
+	// sanitized PodList adapter roots (ADR-0025 A.11.3) need a policy of their
+	// own: the core list plus regexp and net/netip, without touching the
+	// evaluator or pack-admission lists.
+	allowlist []string
 }
+
+// adapterStdlibAllowlist is the independent policy of the sanitized PodList
+// adapter roots (ADR-0025 A.11.3): the core list plus regexp (already used by
+// the prisma-v1 ingestion for static patterns) and net/netip (required by the
+// existing lexical composition of image references). It is not shared with, and
+// does not modify, the evaluator or rulepack policies.
+var adapterStdlibAllowlist = append(append([]string{}, coreStdlibAllowlist...), "regexp", "net/netip")
 
 // coreStdlibAllowlist is the only set of direct standard-library imports the
 // evaluator and pack admission may reach, including through local packages. It
@@ -172,6 +184,12 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 					if policy.core {
 						if !slices.Contains(coreStdlibAllowlist, importPath) {
 							findings = append(findings, closureFinding{chain: location, detail: "standard-library import outside the core allowlist: " + importPath})
+						}
+						continue
+					}
+					if policy.allowlist != nil {
+						if !slices.Contains(policy.allowlist, importPath) {
+							findings = append(findings, closureFinding{chain: location, detail: "standard-library import outside the adapter allowlist: " + importPath})
 						}
 						continue
 					}
