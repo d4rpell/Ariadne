@@ -15,9 +15,11 @@ import (
 	contract "github.com/d4rpell/Ariadne/pkg/evidence"
 )
 
-// InputKind labels where an observation came from. Only synthetic bindings are
-// supported before the container observation adapter exists (A2-01); requesting
-// an unsupported kind is refused fail-closed instead of being inferred.
+// InputKind labels where an observation came from. Synthetic bindings and
+// container-observation bindings (the sanitized PodList profile of ADR-0025)
+// are admitted; any other kind is refused fail-closed instead of being
+// inferred. Admitting a kind never authenticates the origin: provenance is
+// established by the evidence items, not by this label.
 type InputKind string
 
 const (
@@ -264,7 +266,7 @@ func identifier(text string) bool {
 }
 
 func inputKindProblem(kind InputKind) error {
-	if kind == InputSynthetic {
+	if kind == InputSynthetic || kind == InputContainerObservation {
 		return nil
 	}
 	return errInputKindUnsupported
