@@ -33,7 +33,7 @@ Ariadne automates the **evidence preparation and evaluation** of that chain. The
 
 - An offline CLI that evaluates a prepared evidence bundle and renders deterministic JSON/HTML reports; ingestion of supported scanner findings and sanitized `kubectl`/`oc` exports is planned.
 - A conservative identity resolver: CVE → package → digest → workload UID → container.
-- A deterministic evaluator: same evidence bundle + same rules = same result, byte for byte.
+- A deterministic evaluator: the same evidence bundle, the same rules and the same explicit evaluation context (target, admission policy, domain policy, engine version) produce the same result, byte for byte; replay validity is limited to those same engine, profile and presentation semantics ([ADR-0023](docs/adr/ADR-0023-offline-cli-and-replay-contract.md)).
 - An exception record with owner, scope, validity window, and automatic invalidation when the evidence changes.
 - Report export (HTML/JSON), available today through the offline CLI; OpenVEX declarations and SARIF output are planned for 0.3.
 
