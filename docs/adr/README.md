@@ -61,7 +61,7 @@ Two rules apply to every record:
 | [ADR-0023](ADR-0023-offline-cli-and-replay-contract.md) | Offline CLI subset, explicit IO, deterministic replay and test contract | ratified and accepted by the owner (2026-09-28); transport bounds and filesystem policy resolved; implemented and independently reviewed with no open finding (2026-09-28); task accepted by the owner (2026-09-28); distribution of reports and release not authorized |
 | [ADR-0024](ADR-0024-public-repository-visibility.md) | Public repository visibility | accepted (2026-09-29); visibility verified separately |
 | [ADR-0025](ADR-0025-sanitized-podlist-ingestion.md) | Offline ingestion of sanitized PodList exports: closed `sanitized-podlist-v1/1.0` profile, allowlist rejection, explicit coverage and termination | ratified and implemented (2026-09-30); independent review of the implementation closed with no open finding; distribution and release remain unauthorized |
-| [ADR-0026](ADR-0026-optional-pod-collector.md) | Optional read-only Pod collector: closed Pod allowlist, standard-library REST client, fixed budgets and explicit provenance | ratified (2026-10-01); recommended decisions accepted; not implemented; no compatibility claim |
+| [ADR-0026](ADR-0026-optional-pod-collector.md) | Optional read-only Pod collector: closed Pod allowlist, standard-library REST client, fixed budgets and explicit provenance | ratified (2026-10-01); recommended decisions accepted; implemented and accepted (A2-02 F2, 2026-10-01); no compatibility claim |
 
 ## Adding a record
 

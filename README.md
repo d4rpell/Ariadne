@@ -65,7 +65,7 @@ Three components with separated trust and privilege:
 
 | Component | Responsibility | Privilege |
 |---|---|---|
-| Collector (planned; contract [ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md) ratified, not implemented) | Observe and record facts | Planned boundary: read-only (`get`/`list` on allowlisted resources) |
+| Collector ([ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md); implemented read-only, accepted 2026-10-01, not verified against a real cluster) | Observe and record facts | Read-only (`get`/`list` on an allowlisted namespace set); no Secrets, logs, environment values or ConfigMap data |
 | Evaluator | Apply declarative rules offline | None: no network, no shell, no cluster client |
 | Case record (planned) | Record human decisions and validity | Planned boundary: append-only local store |
 
@@ -98,7 +98,7 @@ Core rules:
 | Phase | Scope |
 |---|---|
 | 0.1 | Offline core: strict CSV parser, sanitized export ingestion, normalized identity resolution, hashable evidence bundle, deterministic rule evaluation, HTML/JSON reports, synthetic fixtures with golden outputs |
-| 0.2 | Optional read-only collector (namespace allowlist, scoped RBAC), fake API server tests, verified compatibility matrix per Kubernetes/OpenShift release |
+| 0.2 | Optional read-only collector (namespace allowlist, scoped RBAC): **implemented and accepted 2026-10-01** with synthetic (fake API server) coverage; verified compatibility matrix per Kubernetes/OpenShift release still pending |
 | 0.3 | Exception lifecycle: expiry, diff between runs, re-validation, OpenVEX/SARIF export |
 
 The public demo runs entirely on synthetic fixtures and needs no access to private infrastructure. The repository now ships a runnable walkthrough — [`docs/quickstart.md`](docs/quickstart.md) builds the CLI and runs `evaluate`, `report` and `verify` over the fixtures, with precomposed contexts and byte-exact receipts under [`examples/synthetic-case/`](examples/synthetic-case/). It demonstrates the offline CLI path, not the full CSV-to-case pipeline: `import` and `normalize` do not exist yet.
