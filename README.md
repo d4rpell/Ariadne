@@ -65,7 +65,7 @@ Three components with separated trust and privilege:
 
 | Component | Responsibility | Privilege |
 |---|---|---|
-| Collector (planned) | Observe and record facts | Planned boundary: read-only (`get`/`list` on allowlisted resources) |
+| Collector (planned; contract [ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md) ratified, not implemented) | Observe and record facts | Planned boundary: read-only (`get`/`list` on allowlisted resources) |
 | Evaluator | Apply declarative rules offline | None: no network, no shell, no cluster client |
 | Case record (planned) | Record human decisions and validity | Planned boundary: append-only local store |
 
