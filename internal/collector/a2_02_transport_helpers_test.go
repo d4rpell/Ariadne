@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -45,13 +46,38 @@ func a202ServeTLS(conn net.Conn, certificate *tls.Certificate, response, clientA
 	case <-time.After(3 * time.Second):
 		return errors.New("collector test harness: handshake did not finish")
 	}
+	// The handshake deadline must not bound the exchange: writing a large
+	// response over the synchronous pipe waits for the client's read loop, and
+	// under -race on a loaded runner the handshake's five seconds are not enough
+	// (the CI failure of 2026-10-01 refused a 28672-byte block that way). The
+	// post-handshake phases get their own generous bound; a stuck exchange is
+	// the caller's client-side context deadline, not this harness.
+	if err := server.SetDeadline(time.Now().Add(60 * time.Second)); err != nil {
+		return err
+	}
+	// The request is read before the response is written: a response the server
+	// sends before the request reached the transport is ill-formed HTTP/1.1 and
+	// the stdlib only tolerates it by timing (readLoopPeekFailLocked and the
+	// unsolicited-response log under -race with GOMAXPROCS=1). Reading the
+	// request head makes the exchange order deterministic. A client that never
+	// sends one (a failed verification, for instance) fails the read here and
+	// the caller ignores this error.
+	reader := bufio.NewReader(server)
+	for {
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return readErr
+		}
+		if line == "\r\n" || line == "\n" {
+			break
+		}
+	}
 	if _, err := io.WriteString(server, response); err != nil {
 		return err
 	}
 	// The server end stays open until the client closes its side: the response
 	// is only valid while the bytes are readable, and closing early would turn
 	// a correct exchange into a read failure.
-	_ = server.SetReadDeadline(time.Now().Add(5 * time.Second))
 	_, _ = io.Copy(io.Discard, server)
 	return nil
 }
