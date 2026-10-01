@@ -1,0 +1,1 @@
+{"apiVersion":"v1","kind":"PodList","items":[{"apiVersion":"v1","kind":"Pod","metadata":{"uid":"u2","namespace":"payments","name":"n2"},"spec":{"containers":[{"name":"api","image":"registry.example/app:release"}]},"status":{"containerStatuses":[{"name":"api","imageID":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}}]}

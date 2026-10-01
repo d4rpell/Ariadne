@@ -50,32 +50,44 @@ type boundaryDeclaration struct {
 	// positive. The direct-import scan and the closure keep the full lists.
 	graphExact []string
 	graphTrees []string
+	// allowlist is the closure policy of this root. The collector root uses the
+	// independent list of ADR-0026 A.4.2; the adapter roots keep theirs and the
+	// core roots keep coreStdlibAllowlist.
+	allowlist []string
+	// networkDirs lists the module-relative directories whose own sources may
+	// use the network additions of the collector profile.
+	networkDirs []string
+	// bannedLocal lists package paths forbidden in the sources of the closure.
+	bannedLocal []string
 }
 
 // importBoundaries is the declared surface of the gate. A policy never comes
 // from a rule pack or from user configuration.
 var importBoundaries = []boundaryDeclaration{
 	{
-		name:   "evaluator",
-		target: "../evaluator",
-		dir:    "internal/evaluator",
-		core:   true,
-		exact:  []string{"net"},
-		trees:  []string{"net/http", "os/exec", "k8s.io/client-go"},
+		name:        "evaluator",
+		target:      "../evaluator",
+		dir:         "internal/evaluator",
+		core:        true,
+		exact:       []string{"net"},
+		trees:       []string{"net/http", "os/exec", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
-		name:   "rulepack",
-		target: "../rulepack",
-		dir:    "internal/rulepack",
-		core:   true,
-		exact:  []string{"net"},
-		trees:  []string{"net/http", "os/exec", "k8s.io/client-go"},
+		name:        "rulepack",
+		target:      "../rulepack",
+		dir:         "internal/rulepack",
+		core:        true,
+		exact:       []string{"net"},
+		trees:       []string{"net/http", "os/exec", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
-		name:   "report",
-		target: "../report",
-		dir:    "internal/report",
-		trees:  []string{"os/exec"},
+		name:        "report",
+		target:      "../report",
+		dir:         "internal/report",
+		trees:       []string{"os/exec"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
 		name:   "cli",
@@ -88,8 +100,9 @@ var importBoundaries = []boundaryDeclaration{
 		// inside the standard library: the graph pass bans only what must never
 		// appear even transitively, while `unsafe`, `syscall` and `plugin` remain
 		// forbidden in the adapter's own sources and in the local closure.
-		graphExact: []string{"net", "os/exec", "plugin"},
-		graphTrees: []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	// Sanitized PodList adapter roots (ADR-0025 A.11.3). The profile must not
 	// reach network, shell, filesystem, process execution or cluster clients,
@@ -97,44 +110,68 @@ var importBoundaries = []boundaryDeclaration{
 	// exactly in the sources themselves and in the closure; the graph pass
 	// cannot ban it because the standard library's own `fmt` reaches it.
 	{
-		name:       "ingest",
-		target:     "../ingest",
-		dir:        "internal/ingest",
-		strict:     true,
-		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
-		trees:      []string{"net/http", "k8s.io/client-go"},
-		graphExact: []string{"net", "os/exec", "plugin"},
-		graphTrees: []string{"net/http", "k8s.io/client-go"},
+		name:        "ingest",
+		target:      "../ingest",
+		dir:         "internal/ingest",
+		strict:      true,
+		exact:       []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
-		name:       "normalize",
-		target:     "../normalize",
-		dir:        "internal/normalize",
-		strict:     true,
-		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
-		trees:      []string{"net/http", "k8s.io/client-go"},
-		graphExact: []string{"net", "os/exec", "plugin"},
-		graphTrees: []string{"net/http", "k8s.io/client-go"},
+		name:        "normalize",
+		target:      "../normalize",
+		dir:         "internal/normalize",
+		strict:      true,
+		exact:       []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
-		name:       "identity",
-		target:     "../identity",
-		dir:        "internal/identity",
-		strict:     true,
-		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
-		trees:      []string{"net/http", "k8s.io/client-go"},
-		graphExact: []string{"net", "os/exec", "plugin"},
-		graphTrees: []string{"net/http", "k8s.io/client-go"},
+		name:        "identity",
+		target:      "../identity",
+		dir:         "internal/identity",
+		strict:      true,
+		exact:       []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
 	},
 	{
-		name:       "bundle",
-		target:     "../bundle",
-		dir:        "internal/bundle",
-		strict:     true,
-		exact:      []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
-		trees:      []string{"net/http", "k8s.io/client-go"},
-		graphExact: []string{"net", "os/exec", "plugin"},
-		graphTrees: []string{"net/http", "k8s.io/client-go"},
+		name:        "bundle",
+		target:      "../bundle",
+		dir:         "internal/bundle",
+		strict:      true,
+		exact:       []string{"net", "os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
+	},
+	// Optional live collector (ADR-0026 A.4.2). This is the ninth root and the
+	// only one whose own sources may reach the network: the profile needs a REST
+	// client built on the standard library. The permission lives in
+	// networkDirs and is granted per package by stdlibAllowlistFor: a local
+	// helper reached from the collector keeps the adapter list. `os` stays
+	// forbidden in the sources themselves and in the closure even though the
+	// graph pass cannot ban it (the standard library's fmt reaches it).
+	{
+		name:        "collector",
+		target:      "../collector",
+		dir:         "internal/collector",
+		strict:      true,
+		exact:       []string{"os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"k8s.io/client-go"},
+		graphExact:  []string{"os/exec", "plugin"},
+		graphTrees:  []string{"k8s.io/client-go"},
+		allowlist:   adapterStdlibAllowlist,
+		networkDirs: []string{"internal/collector"},
+		bannedLocal: collectorBannedLocal,
 	},
 }
 
@@ -145,6 +182,19 @@ var adapterRoots = map[string]bool{
 	"normalize": true,
 	"identity":  true,
 	"bundle":    true,
+}
+
+// allowlistFor selects the closure policy declared for one boundary. A root
+// may declare its own list; the adapter roots keep the ADR-0025 policy and
+// every other root keeps the core policy of ADR-0014.
+func allowlistFor(boundary boundaryDeclaration) []string {
+	if boundary.allowlist != nil {
+		return boundary.allowlist
+	}
+	if adapterRoots[boundary.name] {
+		return adapterStdlibAllowlist
+	}
+	return nil
 }
 
 func TestImportBoundary(t *testing.T) {
@@ -176,19 +226,31 @@ func TestImportBoundary(t *testing.T) {
 				if banned := forbiddenMatch(found.path, boundary.exact, boundary.trees); banned != "" {
 					t.Errorf("%s: %s imports %s, forbidden by the import boundary (%s)", importPath, found.file, found.path, banned)
 				}
+				// A root with a per-package allowlist is checked here as well:
+				// the direct scan sees every build variant of the package, so an
+				// addition outside the declared list is refused without waiting
+				// for the closure pass.
+				if boundary.allowlist != nil && stdlibPath(found.path) {
+					packageAllowlist := stdlibAllowlistFor(closurePolicy{allowlist: boundary.allowlist, networkPackages: boundary.networkDirs}, boundary.dir)
+					if !slices.Contains(packageAllowlist, found.path) {
+						t.Errorf("%s: %s imports %s, outside the declared allowlist", importPath, found.file, found.path)
+					}
+				}
 			}
 
 			// The closure is reached through this test on purpose: the gate the
 			// Makefile names selects this function, so a closure failure must
 			// fail here and not only in the analyzer's own cases.
 			closure := analyzeClosure(t, moduleRoot(t), closurePolicy{
-				name:      boundary.name,
-				dir:       boundary.dir,
-				core:      boundary.core,
-				strict:    boundary.strict,
-				exact:     boundary.exact,
-				trees:     boundary.trees,
-				allowlist: allowlistFor(boundary),
+				name:            boundary.name,
+				dir:             boundary.dir,
+				core:            boundary.core,
+				strict:          boundary.strict,
+				exact:           boundary.exact,
+				trees:           boundary.trees,
+				allowlist:       allowlistFor(boundary),
+				networkPackages: boundary.networkDirs,
+				bannedLocal:     boundary.bannedLocal,
 			})
 			for _, finding := range closure {
 				t.Errorf("import closure: %s", finding)
@@ -210,19 +272,16 @@ func forbiddenMatch(path string, exact, trees []string) string {
 	return ""
 }
 
-// allowlistFor selects the stdlib policy of one boundary: the adapter roots use
-// the independent list of ADR-0025 A.11.3, every other boundary keeps the core
-// policy of ADR-0014.
-func allowlistFor(boundary boundaryDeclaration) []string {
-	if adapterRoots[boundary.name] {
-		return adapterStdlibAllowlist
-	}
-	return nil
-}
-
 type directImport struct {
 	file string
 	path string
+}
+
+// stdlibPath is a cheap shape test used only to route a direct import towards
+// the allowlist check: the closure pass verifies the GOROOT location of every
+// import, so this test never decides whether a package is standard library.
+func stdlibPath(importPath string) bool {
+	return importPath != "" && !strings.Contains(importPath, ".")
 }
 
 // Reads every build variant of the package's non-test sources. Files ending in

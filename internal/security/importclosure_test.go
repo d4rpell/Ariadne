@@ -43,6 +43,15 @@ type closurePolicy struct {
 	// own: the core list plus regexp and net/netip, without touching the
 	// evaluator or pack-admission lists.
 	allowlist []string
+	// networkPackages lists the local package directories (module-relative,
+	// slash-separated) whose own sources may use the network additions of the
+	// collector profile. A helper reached from them keeps the adapter allowlist:
+	// the network permission never propagates to another local package.
+	networkPackages []string
+	// bannedLocal are the package paths forbidden in the sources of every local
+	// package of this closure, the root included. They are checked before any
+	// allowlist branch, so a variant file or a local helper cannot smuggle them.
+	bannedLocal []string
 }
 
 // adapterStdlibAllowlist is the independent policy of the sanitized PodList
@@ -51,6 +60,86 @@ type closurePolicy struct {
 // existing lexical composition of image references). It is not shared with, and
 // does not modify, the evaluator or rulepack policies.
 var adapterStdlibAllowlist = append(append([]string{}, coreStdlibAllowlist...), "regexp", "net/netip")
+
+// collectorNetworkAdditions is the exact network addition of the collector
+// profile (ADR-0026 A.4). It is a second, independent list: widening it never
+// widens the adapter list and vice versa.
+var collectorNetworkAdditions = []string{
+	"context",
+	"crypto/tls",
+	"crypto/x509",
+	"net",
+	"net/http",
+	"net/url",
+}
+
+// collectorStdlibAllowlist is the policy of internal/collector: a copy of the
+// adapter list plus the network additions. Only the sources of that package
+// receive it; a local helper reached from it keeps the adapter list.
+var collectorStdlibAllowlist = append(append([]string{}, adapterStdlibAllowlist...), collectorNetworkAdditions...)
+
+// collectorBannedLocal is the closed set of package paths forbidden in the
+// sources of every local package of the collector closure. It covers the
+// process, filesystem, native and dynamic-loading surfaces the profile must
+// never reach, plus the modules the collector must not depend on in either
+// direction.
+var collectorBannedLocal = []string{
+	"os", "os/exec", "unsafe", "syscall", "plugin", "C",
+	"github.com/d4rpell/Ariadne/internal/evaluator",
+	"github.com/d4rpell/Ariadne/internal/rulepack",
+	"github.com/d4rpell/Ariadne/internal/report",
+	"github.com/d4rpell/Ariadne/cmd/ariadne",
+}
+
+// offlineRootBannedLocal is the inverse prohibition of ADR-0026 A.4.1 for every
+// root that must stay offline: none of the eight previous roots may reach the
+// live collector, directly or through a local helper. The prohibition lives in
+// the real policies of those roots, not only in a synthetic control, so an
+// accidental dependency on the network package fails the gate itself.
+var offlineRootBannedLocal = []string{
+	"github.com/d4rpell/Ariadne/internal/collector",
+}
+
+// stdlibAllowlistFor selects the standard-library policy of one import inside
+// one resolved local package. The policy depends on the package that performs
+// the import, not only on the root: the additions of the collector profile are
+// granted exclusively to the sources of internal/collector.
+func stdlibAllowlistFor(policy closurePolicy, localPackage string) []string {
+	if policy.core {
+		return coreStdlibAllowlist
+	}
+	if policy.allowlist == nil {
+		return nil
+	}
+	for _, granted := range policy.networkPackages {
+		if localPackage == granted {
+			return append(append([]string{}, policy.allowlist...), collectorNetworkAdditions...)
+		}
+	}
+	return policy.allowlist
+}
+
+// localPackageFor converts a resolved absolute package directory into the
+// module-relative slash-separated form stdlibAllowlistFor compares. A path
+// outside the root keeps its absolute form, which matches no granted package.
+func localPackageFor(root, absolute string) string {
+	relative, err := filepath.Rel(root, absolute)
+	if err != nil {
+		return absolute
+	}
+	return filepath.ToSlash(relative)
+}
+
+// bannedLocalMatch reports the first banned local package the import path
+// addresses, comparing whole path elements so "osx" is not mistaken for "os".
+func bannedLocalMatch(importPath string, banned []string) string {
+	for _, candidate := range banned {
+		if importPath == candidate || strings.HasPrefix(importPath, candidate+"/") {
+			return candidate
+		}
+	}
+	return ""
+}
 
 // coreStdlibAllowlist is the only set of direct standard-library imports the
 // evaluator and pack admission may reach, including through local packages. It
@@ -165,7 +254,19 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 					findings = append(findings, closureFinding{chain: location, detail: "unsupported directive: " + directive})
 				}
 			}
+			// The local-package allowlist is selected by the package that performs
+			// the import, so the network additions of the collector profile never
+			// reach an intermediate helper.
+			packageAllowlist := stdlibAllowlistFor(policy, localPackageFor(root, dir))
 			for _, importPath := range source.imports {
+				// The local prohibitions govern this package's own sources,
+				// whatever their constraints: they are checked before the local
+				// and standard-library branches, so no variant file and no
+				// helper path can bypass them.
+				if banned := bannedLocalMatch(importPath, policy.bannedLocal); banned != "" {
+					findings = append(findings, closureFinding{chain: location, detail: "forbidden local package: " + banned})
+					continue
+				}
 				switch {
 				case importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/"):
 					target, err := localDir(root, strings.TrimPrefix(strings.TrimPrefix(importPath, modulePath), "/"))
@@ -187,8 +288,8 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 						}
 						continue
 					}
-					if policy.allowlist != nil {
-						if !slices.Contains(policy.allowlist, importPath) {
+					if packageAllowlist != nil {
+						if !slices.Contains(packageAllowlist, importPath) {
 							findings = append(findings, closureFinding{chain: location, detail: "standard-library import outside the adapter allowlist: " + importPath})
 						}
 						continue
