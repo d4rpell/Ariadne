@@ -1,6 +1,6 @@
 # ADR-0028: Optional Prisma API acquisition connector
 
-- **Status:** proposed (2026-10-02); an authorized fallback independent review (repository `code-reviewer`) closed with no open finding in three passes; the primary Astra review remains re-openable when external quota returns; pending owner ratification; not implemented.
+- **Status:** ratified by the owner (2026-10-02, decisions NE-N01..N07); an authorized fallback independent review closed with no open finding in three passes; the primary Astra review remains re-openable when external quota returns; not implemented (implementation requires a separate handoff and authorization).
 - **Origin:** task A2-07-F2; the contract builds on the ratified offline ingestion scope of [ADR-0027](ADR-0027-native-prisma-report-ingestion.md).
 - **Relationships:** develops the network scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) (see its connector precision section). Follows the read-only network precedent of [ADR-0026](ADR-0026-optional-pod-collector.md) as a separate privilege root. Does not change the evidence bundle wire `0.2`, the `prisma-v1` input contract, the decision layers or the Kubernetes collector.
 
