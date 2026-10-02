@@ -4,7 +4,7 @@
 >
 > Turns a container vulnerability finding into a reproducible, auditable evidence record — without executing code inside the pod.
 
-**Status: PRE-ALPHA.** The repository contains the project specification and a working offline core, covered by tests: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing; the strict `prisma-v1` CSV parser (`internal/ingest`, `internal/schema`); conservative normalization and identity resolution (`internal/normalize`, `internal/identity`); the canonical bundle projection (`internal/bundle`); the declarative offline evaluator with fail-closed pack admission (`internal/rulepack`, `internal/evaluator`); the deterministic JSON and HTML report renderer over an evaluation result (`internal/report`); the public wire specification `0.2` with synthetic vectors (`docs/spec/evidence-bundle/`); synthetic fixtures with golden outputs; and a runnable walkthrough (`docs/quickstart.md`, `examples/synthetic-case/`). The offline CLI (`cmd/ariadne`) is implemented and covered by tests — `evaluate`, `report` and `verify` over a canonical evidence bundle, with report files written through an explicit local-filesystem boundary ([ADR-0023](docs/adr/ADR-0023-offline-cli-and-replay-contract.md)). The Kubernetes collector, the deferred CLI subcommands (`import` and `normalize`; `diff` planned for 0.3) and the decision record do not exist yet; the remaining interfaces and command names described below are design targets, not shipped features, and no release is available.
+**Status: PRE-ALPHA.** The repository contains the project specification and a working offline core, covered by tests: the evidence bundle contract (`pkg/evidence`, `internal/evidence`) with fail-closed validation, canonical JSON and SHA-256 hashing; the strict `prisma-v1` CSV parser (`internal/ingest`, `internal/schema`); conservative normalization and identity resolution (`internal/normalize`, `internal/identity`); the canonical bundle projection (`internal/bundle`); the declarative offline evaluator with fail-closed pack admission (`internal/rulepack`, `internal/evaluator`); the deterministic JSON and HTML report renderer over an evaluation result (`internal/report`); the public wire specification `0.2` with synthetic vectors (`docs/spec/evidence-bundle/`); synthetic fixtures with golden outputs; and a runnable walkthrough (`docs/quickstart.md`, `examples/synthetic-case/`). The offline CLI (`cmd/ariadne`) is implemented and covered by tests — `evaluate`, `report` and `verify` over a canonical evidence bundle, with report files written through an explicit local-filesystem boundary ([ADR-0023](docs/adr/ADR-0023-offline-cli-and-replay-contract.md)). The read-only Kubernetes collector ([ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md)) is implemented and has been exercised against a single-node synthetic Kubernetes 1.37.0 lab — see [compatibility](docs/compatibility.md); OpenShift and other releases not verified. It has no CLI acquisition command. The deferred CLI subcommands (`import` and `normalize`; `diff` planned for 0.3) and the decision record do not exist yet; the remaining interfaces and command names described below are design targets, not shipped features, and no release is available.
 
 **Input compatibility today:** `prisma-v1` is an [Ariadne-defined CSV contract](docs/adr/ADR-0007-prisma-v1-schema-and-limits.md), not the header of a verified Prisma Cloud export. The parser rejects headers outside that contract. Direct import of native Prisma CSV or JSON is [planned](docs/adr/ADR-0020-prisma-acquisition-and-vulnerability-data.md), not implemented.
 
@@ -65,7 +65,7 @@ Three components with separated trust and privilege:
 
 | Component | Responsibility | Privilege |
 |---|---|---|
-| Collector ([ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md); implemented read-only, accepted 2026-10-01, not verified against a real cluster) | Observe and record facts | Read-only (`get`/`list` on an allowlisted namespace set); no Secrets, logs, environment values or ConfigMap data |
+| Collector ([ADR-0026](docs/adr/ADR-0026-optional-pod-collector.md); implemented read-only, accepted 2026-10-01; exercised against a single-node synthetic Kubernetes 1.37.0 lab — see [compatibility](docs/compatibility.md); OpenShift and other releases not verified) | Observe and record facts | Read-only (`get`/`list` on an allowlisted namespace set); allowlist projection before persistence — no Secrets, logs, environment values or ConfigMap data are retained |
 | Evaluator | Apply declarative rules offline | None: no network, no shell, no cluster client |
 | Case record (planned) | Record human decisions and validity | Planned boundary: append-only local store |
 
@@ -88,8 +88,7 @@ Core rules:
 ## Security posture
 
 - The current CLI consumes caller-provided, prepared canonical evidence bundles; it does not acquire scanner or cluster sources.
-- The future collector contract excludes Secrets, logs, environment values and ConfigMap data from acquisition and persistence.
-- Pre-persistence redaction is a future collector requirement. Ariadne is not a general sanitizer or secret detector.
+- The collector contract excludes Secrets, logs, environment values and ConfigMap data from **persistence**: it reads Pods through the Kubernetes API and projects only allowlisted fields before anything is retained, so such values are never persisted. Ariadne is not a general sanitizer or secret detector. (In the lab exercise of [compatibility](docs/compatibility.md), the fixtures carried no `env`/`envFrom`, so env redaction was not exercised live.)
 - Rule packs are declarative and content-hashed; the evaluator cannot execute code or reach the network, enforced by a CI import check.
 - No cost, performance or security guarantee is claimed without reproducible evidence.
 
@@ -98,14 +97,14 @@ Core rules:
 | Phase | Scope |
 |---|---|
 | 0.1 | Offline core: strict CSV parser, sanitized export ingestion, normalized identity resolution, hashable evidence bundle, deterministic rule evaluation, HTML/JSON reports, synthetic fixtures with golden outputs |
-| 0.2 | Optional read-only collector (namespace allowlist, scoped RBAC): **implemented and accepted 2026-10-01** with synthetic (fake API server) coverage; verified compatibility matrix per Kubernetes/OpenShift release still pending |
+| 0.2 | Optional read-only collector (namespace allowlist, scoped RBAC): **implemented and accepted 2026-10-01** with synthetic (fake API server) coverage; **one Kubernetes release verified** against a single-node lab (see [compatibility](docs/compatibility.md)); OpenShift and other releases still unverified |
 | 0.3 | Exception lifecycle: expiry, diff between runs, re-validation, OpenVEX/SARIF export |
 
 The public demo runs entirely on synthetic fixtures and needs no access to private infrastructure. The repository now ships a runnable walkthrough — [`docs/quickstart.md`](docs/quickstart.md) builds the CLI and runs `evaluate`, `report` and `verify` over the fixtures, with precomposed contexts and byte-exact receipts under [`examples/synthetic-case/`](examples/synthetic-case/). It demonstrates the offline CLI path, not the full CSV-to-case pipeline: `import` and `normalize` do not exist yet.
 
 ## Documentation
 
-User and contributor documentation lives in [`docs/`](docs/). Start with the [quickstart](docs/quickstart.md) to build the CLI and run it over the synthetic fixtures. The rest will grow as the implementation lands: architecture, evidence schema, rule pack format, compatibility matrix and decision model.
+User and contributor documentation lives in [`docs/`](docs/). Start with the [quickstart](docs/quickstart.md) to build the CLI and run it over the synthetic fixtures, and see [compatibility](docs/compatibility.md) for what has actually been verified against a cluster. The rest will grow as the implementation lands: architecture, evidence schema, rule pack format and decision model.
 
 Decision records live in [`docs/adr/`](docs/adr/README.md): every decision that shapes the product is written down with the alternatives that were considered, the reasons the chosen option was the best available at the time, the limits it introduces and the conditions that would justify revisiting it. That is where the answer to “why does it work this way?” belongs — including the decisions that deliberately *reduce* what the tool claims.
 
