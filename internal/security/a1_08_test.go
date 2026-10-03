@@ -105,13 +105,13 @@ func TestA108ImportBoundaryControls(t *testing.T) {
 				}
 			}
 		}
-		for _, expected := range []string{"evaluator", "rulepack", "report", "cli", "ingest", "normalize", "identity", "bundle", "collector"} {
+		for _, expected := range []string{"evaluator", "rulepack", "report", "cli", "ingest", "normalize", "identity", "bundle", "collector", "prismaacquire"} {
 			if !declared[expected] {
 				t.Fatalf("the %s boundary is no longer declared", expected)
 			}
 		}
-		if len(importBoundaries) != 9 {
-			t.Fatalf("importBoundaries has %d entries, want the nine declared roots", len(importBoundaries))
+		if len(importBoundaries) != 10 {
+			t.Fatalf("importBoundaries has %d entries, want the ten declared roots", len(importBoundaries))
 		}
 	})
 

@@ -78,6 +78,13 @@ var collectorNetworkAdditions = []string{
 // receive it; a local helper reached from it keeps the adapter list.
 var collectorStdlibAllowlist = append(append([]string{}, adapterStdlibAllowlist...), collectorNetworkAdditions...)
 
+// connectorStdlibAllowlist is the policy of internal/prismaacquire (ADR-0028
+// §3.4): the adapter list plus the same closed network addition, as a third,
+// independent list. Widening it never widens the collector or adapter lists,
+// and leaking the permission to a local helper is refused because it is granted
+// per package in networkPackages.
+var connectorStdlibAllowlist = append(append([]string{}, adapterStdlibAllowlist...), "context", "crypto/tls", "crypto/x509", "net", "net/http", "net/url")
+
 // collectorBannedLocal is the closed set of package paths forbidden in the
 // sources of every local package of the collector closure. It covers the
 // process, filesystem, native and dynamic-loading surfaces the profile must
@@ -88,16 +95,33 @@ var collectorBannedLocal = []string{
 	"github.com/d4rpell/Ariadne/internal/evaluator",
 	"github.com/d4rpell/Ariadne/internal/rulepack",
 	"github.com/d4rpell/Ariadne/internal/report",
+	"github.com/d4rpell/Ariadne/internal/prismaacquire",
+	"github.com/d4rpell/Ariadne/cmd/ariadne",
+}
+
+// connectorBannedLocal is the closed set of package paths forbidden in the
+// sources of every local package of the connector closure (ADR-0028 §3.4): the
+// process, filesystem, native and dynamic-loading surfaces, plus the modules
+// the connector must not depend on in either direction (the Kubernetes
+// collector and the domain packages it must stay outside of).
+var connectorBannedLocal = []string{
+	"os", "os/exec", "unsafe", "syscall", "plugin", "C",
+	"github.com/d4rpell/Ariadne/internal/collector",
+	"github.com/d4rpell/Ariadne/internal/evaluator",
+	"github.com/d4rpell/Ariadne/internal/rulepack",
+	"github.com/d4rpell/Ariadne/internal/report",
+	"github.com/d4rpell/Ariadne/internal/bundle",
 	"github.com/d4rpell/Ariadne/cmd/ariadne",
 }
 
 // offlineRootBannedLocal is the inverse prohibition of ADR-0026 A.4.1 for every
-// root that must stay offline: none of the eight previous roots may reach the
-// live collector, directly or through a local helper. The prohibition lives in
-// the real policies of those roots, not only in a synthetic control, so an
-// accidental dependency on the network package fails the gate itself.
+// root that must stay offline: none of the nine offline roots may reach the live
+// collector or the Prisma API connector, directly or through a local helper. The
+// prohibition lives in the real policies of those roots, not only in a synthetic
+// control, so an accidental dependency on a network package fails the gate.
 var offlineRootBannedLocal = []string{
 	"github.com/d4rpell/Ariadne/internal/collector",
+	"github.com/d4rpell/Ariadne/internal/prismaacquire",
 }
 
 // stdlibAllowlistFor selects the standard-library policy of one import inside

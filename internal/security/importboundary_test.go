@@ -173,6 +173,26 @@ var importBoundaries = []boundaryDeclaration{
 		networkDirs: []string{"internal/collector"},
 		bannedLocal: collectorBannedLocal,
 	},
+	// Optional Prisma API acquisition connector (ADR-0028). This is the tenth
+	// root and a second network-privileged root, independent of the collector in
+	// both directions: the two must never import each other. Its own sources may
+	// reach the same closed network addition as the collector, granted per
+	// package; a local helper keeps the adapter list. `os` stays forbidden in
+	// the sources and the closure (the standard library's fmt reaches it, so the
+	// graph pass cannot ban it).
+	{
+		name:        "prismaacquire",
+		target:      "../prismaacquire",
+		dir:         "internal/prismaacquire",
+		strict:      true,
+		exact:       []string{"os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"k8s.io/client-go"},
+		graphExact:  []string{"os/exec", "plugin"},
+		graphTrees:  []string{"k8s.io/client-go"},
+		allowlist:   connectorStdlibAllowlist,
+		networkDirs: []string{"internal/prismaacquire"},
+		bannedLocal: connectorBannedLocal,
+	},
 }
 
 // adapterRoots are the boundary names whose closure uses the independent
