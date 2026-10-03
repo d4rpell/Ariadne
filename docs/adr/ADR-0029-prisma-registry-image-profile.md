@@ -1,6 +1,6 @@
 # ADR-0029: Offline Prisma Cloud Compute registry-image profile
 
-- **Status:** proposed (2026-10-03); pending independent review and owner ratification; **not implemented**. Implementation requires a separate executable handoff and explicit owner authorization.
+- **Status:** proposed (2026-10-03); owner ratification pending. The **registry JSON profile** is implemented, independently reviewed (`apto tras corregir`, 0 P0/0 P1) and published (2026-10-03). The **registry CSV profile is reserved and not implemented**: its literal header (ES-R1) cannot be closed by evidence because no registry export is available for review. Real Prisma compatibility is **not verified**.
 - **Origin:** task A2-07/A2-08 — "Extend profiles to registry images".
 - **Relationships:** develops the registry scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) ("registry images are a later, separately validated profile"). It is a **new contract, not an extension** of [ADR-0027](ADR-0027-native-prisma-report-ingestion.md), which fixes `report_kind` to `deployed_images` and rejects any other value. It is **offline**: it does not touch the network scope of [ADR-0028](ADR-0028-prisma-api-acquisition-connector.md). It preserves the evidence bundle wire `0.2`, `prisma-v1`, the evaluator, the three decision layers and the identity rules. Supersedes no accepted record.
 
@@ -12,7 +12,7 @@ Add a **third** offline native-ingestion profile for **registry-image reports** 
 - Central rule: **a registry scan does not prove deployment**. `runtime_binding = not_attempted`; an explicit prohibition on promoting a registry finding to a deployed finding; the projection to the evidence bundle `0.2` is **empty by contract**; and mandatory global limitation codes `registry_profile` and `registry_not_deployment`.
 - Full reuse of ADR-0027's ratified rigor (private reader, fail-closed budgets with no relaxation, strict admission, field disposition, sanitized-source/manifest/hash-sidecar artifacts and strict replay), with declared registry deltas and **no expansion of what is retained** (`labels`, `hosts` and free metadata stay excluded).
 - The **native report class is a caller declaration, not a property provable from bytes**: a `shared.ImageScanResult` is byte-indistinguishable between a registry and a deployed scan. The separation is of contract and artifacts, not of authenticated provenance.
-- **One input precision remains open**: the **literal CSV header of the registry export** (ES-R1), which blocks that profile's implementation. The earlier precision about the JSON schema **is resolved at the documentary level** by new evidence: `/registry` shares the `shared.ImageScanResult` schema with `/images`.
+- **One input precision remains open and deferred**: the **literal CSV header of the registry export** (ES-R1). No registry export is available for review (owner-confirmed, 2026-10-03), so ES-R1 cannot be closed by evidence and the CSV profile stays reserved. The earlier precision about the JSON schema **is resolved at the documentary level** by new evidence: `/registry` shares the `shared.ImageScanResult` schema with `/images`.
 - The **relative order** between this profile and the API connector (ADR-0028) remains **open**; only the question is recorded.
 
 ## Context and evidence
@@ -57,4 +57,4 @@ A verifiable registry CSV header or a `/registry` JSON response appears that con
 
 ## Delivery status
 
-Registered in both layers on 2026-10-03 as a proposal. **Nothing described here is implemented.** Implementation (the execution phase) requires a separate executable handoff and explicit, separate owner authorization, and the CSV profile cannot start while ES-R1 remains open. Ariadne is pre-alpha; no distribution of bundles or reports and no release is authorized.
+Registered in both layers on 2026-10-03 as a proposal. The **registry JSON profile** is implemented, independently reviewed with no open P0/P1 and published on 2026-10-03. The **registry CSV profile cannot start until ES-R1 is closed with verifiable evidence** of the literal registry CSV header, and no registry export is available for review, so it stays reserved. Owner ratification of this record is pending. Ariadne is pre-alpha; no distribution of bundles or reports and no release is authorized.
