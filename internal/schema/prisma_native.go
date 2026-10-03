@@ -44,6 +44,28 @@ const (
 	NativeAcquisitionKindAPI       = "compute_api"
 )
 
+// Registry-image family of ADR-0029: a separate report class with its own
+// report_kind, artifact version and formats. It reuses the deployed-image field
+// disposition and budgets unchanged; only the report class, the artifact family
+// and the CI-oriented semantics differ. The CSV selector/profile are reserved
+// (ES-R1 open) and are not admitted.
+const (
+	NativeRegistryJSONSelector     = "prisma-native-registry-json-v1"
+	NativeRegistryCSVSelector      = "prisma-native-registry-csv-v1"
+	NativeRegistryInputVersion     = "2.0"
+	NativeRegistryJSONProfile      = "compute-sh-34.04.145-registry-json"
+	NativeRegistryCSVProfile       = "compute-sh-34.04.145-registry-csv-candidate"
+	NativeRegistryAdapterSemantics = "prisma-native-offline-registry/1.0"
+	NativeRegistrySourceFormat     = "prisma-native-registry-source-v1"
+	NativeRegistryManifestFormat   = "prisma-native-registry-manifest-v1"
+)
+
+// Report class literals of the native context (ADR-0027 §5, ADR-0029 §4.7).
+const (
+	NativeReportKindDeployed = "deployed_images"
+	NativeReportKindRegistry = "registry_images"
+)
+
 // Native budget limits of ADR-0027 §6.2. Each guard is checked before the
 // buffer or collection that would exceed it grows; L is admitted and L+1 is
 // rejected.
@@ -386,7 +408,7 @@ func NativeValidateSelection(selector, field string) bool {
 		}
 		return false
 	}
-	if selector != NativeJSONSelector || len(field) < 2 || field[0] != '/' {
+	if (selector != NativeJSONSelector && selector != NativeRegistryJSONSelector) || len(field) < 2 || field[0] != '/' {
 		return false
 	}
 	current := ""
@@ -551,6 +573,26 @@ func NativeLossReasons() []string {
 func NativeLimitations() []string {
 	return []string{
 		"documentary_profile", "csv_header_unverified", "origin_version_unknown",
+		"origin_not_authenticated", "inventory_not_verified", "no_runtime_binding",
+		"cvss_consistency_not_verified", "original_content_not_retained",
+		"data_excluded", "fields_incomplete", "values_invalid",
+		"values_uninterpretable", "capture_aborted", "capture_unknown",
+		"scope_unknown", "selection_restricted", "page_scope_unverified",
+		"scan_error_reported", "distro_coverage_missing", "temporal_conflict",
+		"attribute_source_conflict", "declared_count_difference",
+	}
+}
+
+// NativeRegistryLimitations is the ordered limitation catalogue of the
+// registry-image family (ADR-0029 §11.6): the deployed-image catalogue with
+// registry_profile inserted at position 2 and registry_not_deployment at
+// position 4, for 24 codes. A registry manifest emits only the activated
+// subset, in this order; for a JSON source csv_header_unverified is inactive, so
+// registry_not_deployment appears at position 3 of the emitted array.
+func NativeRegistryLimitations() []string {
+	return []string{
+		"documentary_profile", "registry_profile", "csv_header_unverified",
+		"registry_not_deployment", "origin_version_unknown",
 		"origin_not_authenticated", "inventory_not_verified", "no_runtime_binding",
 		"cvss_consistency_not_verified", "original_content_not_retained",
 		"data_excluded", "fields_incomplete", "values_invalid",

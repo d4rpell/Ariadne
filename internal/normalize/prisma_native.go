@@ -99,8 +99,14 @@ func outputLimit() *ingest.NativeError {
 func BuildNativeManifest(source ingest.NativeSource, sourceHash string, sourceBytes uint64) (ingest.NativeManifest, *ingest.NativeError) {
 	acc := newNativeAccumulator()
 	isCSV := source.Profile.Selector == schema.NativeCSVSelector
+	isRegistry := source.Profile.Selector == schema.NativeRegistryJSONSelector ||
+		source.Profile.Selector == schema.NativeRegistryCSVSelector
 
 	acc.activate("documentary_profile")
+	if isRegistry {
+		acc.activate("registry_profile")
+		acc.activate("registry_not_deployment")
+	}
 	if isCSV {
 		acc.activate("csv_header_unverified")
 	}
@@ -132,7 +138,7 @@ func BuildNativeManifest(source ingest.NativeSource, sourceHash string, sourceBy
 		OriginalBytes: source.Input.OriginalBytes,
 		Profile:       source.Profile,
 		Counts:        acc.counts,
-		Limitations:   orderedLimitations(acc.limitations),
+		Limitations:   orderedLimitations(acc.limitations, isRegistry),
 		Version:       source.Version,
 	}
 	losses, err := orderedLosses(acc.losses)
@@ -646,10 +652,16 @@ func orderedLosses(losses map[nativeLossKey]uint64) ([]ingest.NativeLoss, *inges
 	return out, nil
 }
 
-// orderedLimitations returns the activated limitations in contract order.
-func orderedLimitations(set map[string]bool) []string {
+// orderedLimitations returns the activated limitations in contract order. The
+// registry family uses its own 24-code catalogue (ADR-0029 §11.6); the deployed
+// family keeps the 22-code catalogue of ADR-0027 §12.5.6.
+func orderedLimitations(set map[string]bool, registry bool) []string {
+	catalogue := schema.NativeLimitations()
+	if registry {
+		catalogue = schema.NativeRegistryLimitations()
+	}
 	out := []string{}
-	for _, code := range schema.NativeLimitations() {
+	for _, code := range catalogue {
 		if set[code] {
 			out = append(out, code)
 		}
@@ -663,12 +675,20 @@ func orderedLimitations(set map[string]bool) []string {
 // the manifest facts are recomputed from the source and compared, and any
 // divergence is a fatal diagnostic. No caller-supplied counter is trusted.
 func ReplayPrismaNative(source, manifest, digest io.Reader, artifactSelector, artifactVersion string) (NativeInventory, *ingest.NativeError) {
-	if artifactSelector != schema.NativeSourceFormat {
+	if artifactSelector != schema.NativeSourceFormat && artifactSelector != schema.NativeRegistrySourceFormat {
 		return NativeInventory{}, &ingest.NativeError{
 			Code: ingest.NativeCodeUnsupportedSelector, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
 		}
 	}
-	if artifactVersion != schema.NativeFormatVersion && artifactVersion != schema.NativeFormatVersionV11 {
+	if artifactVersion != schema.NativeFormatVersion && artifactVersion != schema.NativeFormatVersionV11 && artifactVersion != schema.NativeRegistryInputVersion {
+		return NativeInventory{}, &ingest.NativeError{
+			Code: ingest.NativeCodeUnsupportedVersion, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
+		}
+	}
+	// The requested selector and version must belong to the same family before any
+	// reader is consumed (ADR-0029 §4.7): the registry selector is the 2.0 line
+	// only and the deployed selector is the 1.x line.
+	if (artifactSelector == schema.NativeRegistrySourceFormat) != (artifactVersion == schema.NativeRegistryInputVersion) {
 		return NativeInventory{}, &ingest.NativeError{
 			Code: ingest.NativeCodeUnsupportedVersion, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
 		}
@@ -703,6 +723,17 @@ func ReplayPrismaNative(source, manifest, digest io.Reader, artifactSelector, ar
 	if parsed.Version != artifactVersion || declared.Version != artifactVersion {
 		return NativeInventory{}, &ingest.NativeError{
 			Code: ingest.NativeCodeUnsupportedVersion, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
+		}
+	}
+	// The requested selector must match the family carried by the artifacts, so a
+	// registry source is never replayed under the deployed selector or the reverse.
+	expectedSelector := schema.NativeSourceFormat
+	if parsed.Profile.Name == schema.NativeRegistryJSONProfile || parsed.Profile.Name == schema.NativeRegistryCSVProfile {
+		expectedSelector = schema.NativeRegistrySourceFormat
+	}
+	if artifactSelector != expectedSelector {
+		return NativeInventory{}, &ingest.NativeError{
+			Code: ingest.NativeCodeUnsupportedSelector, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
 		}
 	}
 	if !validManifestSidecar(digestBytes) {

@@ -126,7 +126,14 @@ func validateNativeContextVersion(ctx NativeContext, version string) *NativeErro
 	default:
 		return fail()
 	}
-	if ctx.ReportKind != "deployed_images" {
+	// The artifact version identifies the family (ADR-0029 §4.7): the 2.0 line is
+	// the registry-image family (report_kind registry_images) and the 1.x line is
+	// the deployed-image family. The report_kind must match the version's family.
+	expectedReportKind := schema.NativeReportKindDeployed
+	if version == schema.NativeRegistryInputVersion {
+		expectedReportKind = schema.NativeReportKindRegistry
+	}
+	if ctx.ReportKind != expectedReportKind {
 		return fail()
 	}
 	switch ctx.AcquisitionKind {

@@ -24,6 +24,7 @@ type nativeTree struct {
 	keys     []string
 	vals     []nativeTree
 	valStart []uint64 // per object member: byte offset of its value
+	keyStart []uint64 // per object member: byte offset of its key
 }
 
 func (t nativeTree) member(name string) (nativeTree, bool) {
@@ -602,6 +603,7 @@ func (p *nativeJSONParser) parseTreeValue(depth int) (nativeTree, *NativeError) 
 			node.keys = append(node.keys, key)
 			node.vals = append(node.vals, value)
 			node.valStart = append(node.valStart, uint64(valueStart))
+			node.keyStart = append(node.keyStart, uint64(keyStart))
 			p.skipWS()
 			if p.eat(',') {
 				if err := p.tickToken(); err != nil {
@@ -702,7 +704,7 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 	}
 	format, _ := t.member("format")
 	version, _ := t.member("version")
-	if format.str != schema.NativeSourceFormat || !validArtifactVersion(version.str) {
+	if (format.str != schema.NativeSourceFormat && format.str != schema.NativeRegistrySourceFormat) || !validArtifactVersion(version.str) {
 		return NativeSource{}, artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	profileNode, _ := t.member("profile")
@@ -710,9 +712,13 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 	if err != nil {
 		return NativeSource{}, err
 	}
-	if version.str == schema.NativeFormatVersionV11 && profile.Selector != schema.NativeJSONSelector {
-		// The 1.1 provenance is reserved to the selected JSON profile (§9.5); a
-		// CSV artifact presented under it is rejected.
+	if format.str != nativeSourceFormat(profile) {
+		return NativeSource{}, artifactError(NativeCodeInvalidArtifact, 0)
+	}
+	if !validFamilyVersion(profile, version.str) {
+		// The artifact version must match the profile family in both directions
+		// (ADR-0029 §4.7): a registry profile is the 2.0 line only and a deployed
+		// profile is the 1.x line, with 1.1 reserved to the JSON profile.
 		return NativeSource{}, artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	contextNode, _ := t.member("context")
@@ -743,7 +749,7 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 // validArtifactVersion reports whether v is one of the artifact provenance
 // versions of ADR-0028 §9.5.
 func validArtifactVersion(v string) bool {
-	return v == schema.NativeFormatVersion || v == schema.NativeFormatVersionV11
+	return v == schema.NativeFormatVersion || v == schema.NativeFormatVersionV11 || v == schema.NativeRegistryInputVersion
 }
 
 func readNativeProfileTree(t nativeTree, space string) (NativeProfile, *NativeError) {
@@ -759,7 +765,7 @@ func readNativeProfileTree(t nativeTree, space string) (NativeProfile, *NativeEr
 		Selector: selector.str, InputVersion: version.str, Name: name.str,
 		RedactionPolicy: policy.str, AdapterSemantics: semantics.str,
 	}
-	if !(profile == jsonProfile() || profile == csvProfile()) {
+	if !knownNativeProfile(profile) {
 		return NativeProfile{}, artifactErrorSpace(NativeCodeInvalidArtifact, space, 0)
 	}
 	return profile, nil
@@ -774,7 +780,18 @@ func readNativeContextTree(t nativeTree, version string) (NativeContext, *Native
 		"selected_fields", "page_mode", "page_ordinal", "pages_expected",
 		"data_policy_ack",
 	}
-	if t.kind != 'o' || !hasKeys(t, names...) {
+	if t.kind != 'o' {
+		return NativeContext{}, artifactError(NativeCodeInvalidArtifact, 0)
+	}
+	if !hasKeys(t, names...) {
+		// An unknown context key (e.g. deployment_scope) is anchored at the start
+		// of that key (ADR-0027 §12.4.2); a missing required member keeps offset 0.
+		if off, ok := firstUnknownKeyOffset(t, names); ok {
+			return NativeContext{}, &NativeError{
+				Code: NativeCodeInvalidArtifact, Phase: NativePhaseReplayAdmission,
+				OffsetSpace: NativeSpaceSource, Offset: off,
+			}
+		}
 		return NativeContext{}, artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	ctx := NativeContext{}
@@ -919,7 +936,7 @@ func readNativeManifestTree(t nativeTree) (NativeManifest, *NativeError) {
 	originalBytesNode, _ := t.member("original_bytes")
 	originalHash, _ := t.member("original_hash")
 	manBad := func() *NativeError { return artifactErrorSpace(NativeCodeInvalidArtifact, NativeSpaceManifest, 0) }
-	if format.str != schema.NativeManifestFormat || !validArtifactVersion(version.str) || name.str != schema.NativeSourceName {
+	if (format.str != schema.NativeManifestFormat && format.str != schema.NativeRegistryManifestFormat) || !validArtifactVersion(version.str) || name.str != schema.NativeSourceName {
 		return NativeManifest{}, manBad()
 	}
 	if !validSourceHashLiteral(hash.str) {
@@ -940,6 +957,14 @@ func readNativeManifestTree(t nativeTree) (NativeManifest, *NativeError) {
 	profile, err := readNativeProfileTree(profileNode, NativeSpaceManifest)
 	if err != nil {
 		return NativeManifest{}, err
+	}
+	if format.str != nativeManifestFormat(profile) {
+		return NativeManifest{}, manBad()
+	}
+	if !validFamilyVersion(profile, version.str) {
+		// The manifest version must match the profile family, in both directions
+		// (ADR-0029 §4.7).
+		return NativeManifest{}, manBad()
 	}
 	countsNode, _ := t.member("counts")
 	counts, err := readNativeCountsTree(countsNode, NativeSpaceManifest)
@@ -1019,6 +1044,24 @@ func hasKeys(t nativeTree, names ...string) bool {
 		}
 	}
 	return true
+}
+
+// firstUnknownKeyOffset returns the byte offset of the first object member whose
+// key is not in names, if any.
+func firstUnknownKeyOffset(t nativeTree, names []string) (uint64, bool) {
+	known := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		known[n] = struct{}{}
+	}
+	for i, k := range t.keys {
+		if _, ok := known[k]; !ok {
+			if i < len(t.keyStart) {
+				return t.keyStart[i], true
+			}
+			return 0, true
+		}
+	}
+	return 0, false
 }
 
 // parseCanonicalUint parses a canonical non-negative decimal integer.
@@ -1115,10 +1158,10 @@ func ValidateNativeValueShape(src NativeSource) *NativeError {
 // projection schema) so an encoder cannot publish a mutated or empty DTO
 // (ADR-0027 §6.5 steps 5-7, §11.3).
 func ValidateNativeSource(src NativeSource) *NativeError {
-	if !(src.Profile == jsonProfile() || src.Profile == csvProfile()) {
+	if !knownNativeProfile(src.Profile) {
 		return artifactError(NativeCodeInvalidArtifact, 0)
 	}
-	if canonicalArtifactVersion(src.Version) == schema.NativeFormatVersionV11 && src.Profile != jsonProfile() {
+	if !validFamilyVersion(src.Profile, canonicalArtifactVersion(src.Version)) {
 		return artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	if err := validateNativeContextVersion(src.Context, canonicalArtifactVersion(src.Version)); err != nil {

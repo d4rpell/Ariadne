@@ -151,7 +151,7 @@ func EncodeNativeSourceBounded(src NativeSource, limit int) ([]byte, bool) {
 func writeNativeSource(w *nativeWriter, src NativeSource) {
 	w.rawByte('{')
 	w.key("format")
-	w.stringLiteral("prisma-native-source-v1")
+	w.stringLiteral(nativeSourceFormat(src.Profile))
 	w.rawByte(',')
 	w.key("version")
 	w.stringLiteral(canonicalArtifactVersion(src.Version))
@@ -217,7 +217,7 @@ func EncodeNativeManifestBounded(man NativeManifest, limit int) ([]byte, bool) {
 func writeNativeManifest(w *nativeWriter, man NativeManifest) {
 	w.rawByte('{')
 	w.key("format")
-	w.stringLiteral("prisma-native-manifest-v1")
+	w.stringLiteral(nativeManifestFormat(man.Profile))
 	w.rawByte(',')
 	w.key("version")
 	w.stringLiteral(canonicalArtifactVersion(man.Version))

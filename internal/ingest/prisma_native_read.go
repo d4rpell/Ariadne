@@ -19,19 +19,28 @@ const nativeReadChunk = 32 * 1024
 // and returns its derived source, or a fatal diagnostic. The selector and the
 // input version must match the profile exactly; no fallback is attempted.
 func ParsePrismaNative(reader io.Reader, selector, version, profile string, ctx NativeContext) (NativeSource, *NativeError) {
-	if err := validateNativeContext(ctx); err != nil {
-		return NativeSource{}, err
-	}
+	// The selector identifies the family, which fixes the context report_kind used
+	// for validation (ADR-0029 §4.7). Context validation keeps its F1 position:
+	// before any reader consumes the source.
 	expected := ""
+	ctxVersion := schema.NativeFormatVersion
+	requiredVersion := schema.NativeInputVersion
 	switch selector {
 	case schema.NativeJSONSelector:
 		expected = schema.NativeJSONProfile
 	case schema.NativeCSVSelector:
 		expected = schema.NativeCSVProfile
+	case schema.NativeRegistryJSONSelector:
+		expected = schema.NativeRegistryJSONProfile
+		ctxVersion = schema.NativeRegistryInputVersion
+		requiredVersion = schema.NativeRegistryInputVersion
 	default:
 		return NativeSource{}, nativeFailure(NativeCodeUnsupportedSelector, NativePhaseContext, NativeSpaceNone, 0)
 	}
-	if version != schema.NativeInputVersion {
+	if err := validateNativeContextVersion(ctx, ctxVersion); err != nil {
+		return NativeSource{}, err
+	}
+	if version != requiredVersion {
 		return NativeSource{}, nativeFailure(NativeCodeUnsupportedVersion, NativePhaseContext, NativeSpaceNone, 0)
 	}
 	if profile != expected {
@@ -49,10 +58,14 @@ func ParsePrismaNative(reader io.Reader, selector, version, profile string, ctx 
 	if err != nil {
 		return NativeSource{}, err
 	}
-	if selector == schema.NativeCSVSelector {
+	switch selector {
+	case schema.NativeCSVSelector:
 		return parsePrismaNativeCSV(data, ctx)
+	case schema.NativeRegistryJSONSelector:
+		return parsePrismaNativeRegistryJSON(data, ctx)
+	default:
+		return parsePrismaNativeJSON(data, ctx)
 	}
-	return parsePrismaNativeJSON(data, ctx)
 }
 
 // validateDeclaredOrigin rejects a declared edition or release other than the
