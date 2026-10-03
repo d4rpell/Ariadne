@@ -147,54 +147,130 @@ func EncodeNativeSourceBounded(src NativeSource, limit int) ([]byte, bool) {
 	return w.bytes(), !w.over
 }
 
-// writeNativeSource emits the canonical source into w.
+// NativeOutputBudget is the shared, mutable derived-output accounting of the
+// acquisition (ADR-0028 §7.9). It is plain data, never a caller callback.
+// PageSourceBytes is the remaining per-page native-source.json budget; the
+// caller resets it per page. RetainedBytes and DerivedTokens are accumulated
+// across pages and are decremented by the caller only once a page's three
+// artifacts are accepted.
+type NativeOutputBudget struct {
+	PageSourceBytes uint64
+	RetainedBytes   uint64
+	DerivedTokens   uint64
+}
+
+// NativeSourceTokenCount returns the F1 derived-token count of an already
+// canonical native source, using the same reader and token definition as the
+// replay admission of §11.9.1. It reports false when the bytes are not a valid
+// canonical source or exceed the derived-token ceiling.
+func NativeSourceTokenCount(sourceBytes []byte) (uint64, bool) {
+	var p nativeJSONParser
+	if _, err := p.parseTree(sourceBytes, schema.NativeMaxDerivedSourceDepth, schema.NativeMaxDerivedSourceTokens, sourceLexicalLimits()); err != nil {
+		return 0, false
+	}
+	return p.tokens, true
+}
+
+// EncodeNativeSourceBudgeted serializes the source under the shared derived
+// output budget of §7.9. The page and retained byte budgets stop the shared
+// writer before the buffer grows past them; the derived-token budget is reserved
+// by the same shared writer as it emits every canonical lexeme, so an
+// over-budget source is refused before the rest is built instead of being
+// serialized and then re-parsed. The count is identical to the replay admission
+// (parseTree) of the delivered canonical bytes. It does not mutate the budget;
+// the caller reserves only on success. The returned diagnostic distinguishes a
+// byte exhaustion (output_limit) from a derived-token exhaustion (token_limit).
+func EncodeNativeSourceBudgeted(src NativeSource, b NativeOutputBudget) ([]byte, uint64, *NativeError) {
+	limit := b.PageSourceBytes
+	if b.RetainedBytes < limit {
+		limit = b.RetainedBytes
+	}
+	if limit == 0 || limit > uint64(maxInt()) {
+		return nil, 0, budgetFailure(NativeCodeOutputLimit)
+	}
+	var w nativeWriter
+	w.limit = int(limit)
+	w.tokenActive = true
+	w.tokenLimit = b.DerivedTokens
+	writeNativeSource(&w, src)
+	switch {
+	case w.tokenOver:
+		return nil, 0, budgetFailure(NativeCodeTokenLimit)
+	case w.over:
+		return nil, 0, budgetFailure(NativeCodeOutputLimit)
+	}
+	return w.bytes(), w.tokens, nil
+}
+
+// budgetFailure is the closed derived-budget diagnostic of §7.14.
+func budgetFailure(code string) *NativeError {
+	return &NativeError{Code: code, Phase: NativePhaseProjection, OffsetSpace: NativeSpaceNone}
+}
+
+// maxInt is the platform maximum int value, so a uint64 budget is converted
+// without overflow.
+func maxInt() int { return int(^uint(0) >> 1) }
+
+// writeNativeSource emits the canonical source into w. Once a budget is
+// exhausted it returns without traversing the remaining records or emitting
+// further canonical bytes (§7.10).
 func writeNativeSource(w *nativeWriter, src NativeSource) {
+	w.enter()
 	w.rawByte('{')
 	w.key("format")
-	w.stringLiteral(nativeSourceFormat(src.Profile))
-	w.rawByte(',')
+	w.stringValue(nativeSourceFormat(src.Profile))
+	w.sep()
 	w.key("version")
-	w.stringLiteral(canonicalArtifactVersion(src.Version))
-	w.rawByte(',')
+	w.stringValue(canonicalArtifactVersion(src.Version))
+	w.sep()
 	w.key("profile")
 	w.profile(src.Profile)
-	w.rawByte(',')
+	w.sep()
 	w.key("context")
 	w.context(src.Context)
-	w.rawByte(',')
+	w.sep()
 	w.key("input")
 	w.input(src.Input)
-	w.rawByte(',')
+	w.sep()
 	w.key("records")
+	w.enter()
 	w.rawByte('[')
 	for i, record := range src.Records {
+		if w.over {
+			return
+		}
 		if i > 0 {
-			w.rawByte(',')
+			w.sep()
 		}
 		writeNativeRecord(w, record)
 	}
-	w.rawByte(']')
-	w.rawByte('}')
+	w.end(']')
+	w.end('}')
 }
 
-// writeNativeRecord emits one complete records[] envelope.
+// writeNativeRecord emits one complete records[] envelope, stopping before any
+// further work once a budget is exhausted.
 func writeNativeRecord(w *nativeWriter, record NativeRecord) {
+	if w.over {
+		return
+	}
+	w.enter()
 	w.rawByte('{')
 	w.key("ordinal")
 	w.uint(uint64(record.Ordinal))
-	w.rawByte(',')
+	w.sep()
 	w.key("origin_locator")
-	w.stringLiteral(record.OriginLocator)
-	w.rawByte(',')
+	w.stringValue(record.OriginLocator)
+	w.sep()
 	w.key("origin_start")
 	w.uint(record.OriginStart)
-	w.rawByte(',')
+	w.sep()
 	w.key("origin_end")
 	w.uint(record.OriginEnd)
-	w.rawByte(',')
+	w.sep()
 	w.key("data")
 	w.value(record.Data)
-	w.rawByte('}')
+	w.end('}')
 }
 
 // EncodeNativeManifest serializes the manifest with §11.4 canonical rules.
@@ -318,9 +394,105 @@ type nativeWriter struct {
 	buf   []byte
 	limit int
 	over  bool
+
+	// Derived-token accounting (ADR-0028 §7.9). When tokenActive the writer
+	// reserves one derived token per canonical lexeme as it emits and stops
+	// (over) as soon as the remaining derived-token budget is exhausted, so an
+	// over-budget source is refused before the rest is built. The count equals
+	// the replay admission (parseTree) of the same canonical bytes. When
+	// tokenActive is false (the offline 1.0/2.0 paths) the counter is inert and
+	// the emitted bytes are unchanged.
+	tokenActive bool
+	tokenLimit  uint64
+	tokens      uint64
+	tokenOver   bool
+
+	// processed counts the value entries the shared writer actually started
+	// while a derived-token budget was active. Production never reads it; the
+	// derived-budget tests use it to prove the writer stops traversing the
+	// source as soon as the budget is exhausted (§7.10) instead of only
+	// refusing an already built buffer. It is not incremented on the offline
+	// paths, so their work and bytes are unchanged.
+	processed uint64
 }
 
 func (w *nativeWriter) bytes() []byte { return w.buf }
+
+// tick reserves one derived token. It is O(1) and inert on the offline paths.
+func (w *nativeWriter) tick() {
+	if !w.tokenActive || w.over {
+		return
+	}
+	w.tokens++
+	if w.tokens > w.tokenLimit {
+		w.tokenOver = true
+		w.over = true
+	}
+}
+
+// enter reserves the entry token of one JSON value (scalar, object or array).
+// Once a budget is exhausted the caller must not reach it again, so the entry
+// count is bounded by the token budget; the counter is inert on the offline
+// paths.
+func (w *nativeWriter) enter() {
+	if w.tokenActive {
+		w.processed++
+	}
+	w.tick()
+}
+
+// sep emits a structural comma and reserves its token. The byte budget is
+// checked first (preserving the output_limit precedence) and the token is
+// reserved before the byte is written, so an exhaustion never emits a comma it
+// has not accounted for and never keeps processing another lexeme (§7.10).
+func (w *nativeWriter) sep() {
+	if !w.hasRoom(1) {
+		return
+	}
+	w.tick()
+	if w.over {
+		return
+	}
+	w.rawByte(',')
+}
+
+// end emits a closing brace or bracket and reserves its token before the byte,
+// with the same byte-budget precedence as sep.
+func (w *nativeWriter) end(b byte) {
+	if !w.hasRoom(1) {
+		return
+	}
+	w.tick()
+	if w.over {
+		return
+	}
+	w.rawByte(b)
+}
+
+// hasRoom reports whether n more bytes fit the byte budget without appending,
+// marking the writer over when they do not.
+func (w *nativeWriter) hasRoom(n int) bool {
+	if w.over {
+		return false
+	}
+	if w.limit > 0 && len(w.buf)+n > w.limit {
+		w.over = true
+		return false
+	}
+	return true
+}
+
+// stringValue reserves one value token and emits a canonical string literal.
+func (w *nativeWriter) stringValue(value string) {
+	if w.over {
+		return
+	}
+	w.enter()
+	if w.over {
+		return
+	}
+	w.stringLiteral(value)
+}
 
 // put appends p only while the writer stays within its budget.
 func (w *nativeWriter) put(p []byte) {
@@ -347,11 +519,24 @@ func (w *nativeWriter) rawByte(b byte) {
 
 func (w *nativeWriter) rawLiteral(s string) { w.put([]byte(s)) }
 
-// key emits a canonical object key followed by ':'.
+// key emits a canonical object key followed by ':' and reserves the key and the
+// colon lexemes, mirroring the replay admission. Both tokens are reserved before
+// their bytes, so an exhaustion never writes a lexeme it has not accounted for.
 func (w *nativeWriter) key(name string) {
+	if w.over {
+		return
+	}
+	w.tick()
+	if w.over {
+		return
+	}
 	w.rawByte('"')
 	w.escape(name)
 	w.rawByte('"')
+	w.tick()
+	if w.over {
+		return
+	}
 	w.rawByte(':')
 }
 
@@ -362,8 +547,15 @@ func (w *nativeWriter) stringLiteral(value string) {
 	w.rawByte('"')
 }
 
-// uint emits a canonical non-negative decimal integer.
+// uint emits a canonical non-negative decimal integer as one value.
 func (w *nativeWriter) uint(value uint64) {
+	if w.over {
+		return
+	}
+	w.enter()
+	if w.over {
+		return
+	}
 	w.put([]byte(strconv.FormatUint(value, 10)))
 }
 
@@ -413,120 +605,152 @@ func (w *nativeWriter) escape(value string) {
 
 // profile emits the closed profile object in §11.2 order.
 func (w *nativeWriter) profile(p NativeProfile) {
+	if w.over {
+		return
+	}
+	w.enter()
 	w.rawByte('{')
 	w.key("selector")
-	w.stringLiteral(p.Selector)
-	w.rawByte(',')
+	w.stringValue(p.Selector)
+	w.sep()
 	w.key("input_version")
-	w.stringLiteral(p.InputVersion)
-	w.rawByte(',')
+	w.stringValue(p.InputVersion)
+	w.sep()
 	w.key("name")
-	w.stringLiteral(p.Name)
-	w.rawByte(',')
+	w.stringValue(p.Name)
+	w.sep()
 	w.key("redaction_policy")
-	w.stringLiteral(p.RedactionPolicy)
-	w.rawByte(',')
+	w.stringValue(p.RedactionPolicy)
+	w.sep()
 	w.key("adapter_semantics")
-	w.stringLiteral(p.AdapterSemantics)
-	w.rawByte('}')
+	w.stringValue(p.AdapterSemantics)
+	w.end('}')
 }
 
 // context emits the closed context object in §11.2 order.
 func (w *nativeWriter) context(c NativeContext) {
+	if w.over {
+		return
+	}
+	w.enter()
 	w.rawByte('{')
 	w.key("origin_alias")
-	w.stringLiteral(c.OriginAlias)
-	w.rawByte(',')
+	w.stringValue(c.OriginAlias)
+	w.sep()
 	w.key("source_alias")
-	w.stringLiteral(c.SourceAlias)
-	w.rawByte(',')
+	w.stringValue(c.SourceAlias)
+	w.sep()
 	w.key("declared_edition")
-	w.stringLiteral(c.DeclaredEdition)
-	w.rawByte(',')
+	w.stringValue(c.DeclaredEdition)
+	w.sep()
 	w.key("declared_release")
-	w.stringLiteral(c.DeclaredRelease)
-	w.rawByte(',')
+	w.stringValue(c.DeclaredRelease)
+	w.sep()
 	w.key("version_basis")
-	w.stringLiteral(c.VersionBasis)
-	w.rawByte(',')
+	w.stringValue(c.VersionBasis)
+	w.sep()
 	w.key("report_kind")
-	w.stringLiteral(c.ReportKind)
-	w.rawByte(',')
+	w.stringValue(c.ReportKind)
+	w.sep()
 	w.key("acquisition_kind")
-	w.stringLiteral(c.AcquisitionKind)
-	w.rawByte(',')
+	w.stringValue(c.AcquisitionKind)
+	w.sep()
 	w.key("acquired_at")
-	w.stringLiteral(c.AcquiredAt)
-	w.rawByte(',')
+	w.stringValue(c.AcquiredAt)
+	w.sep()
 	w.key("capture_termination")
-	w.stringLiteral(c.CaptureTermination)
-	w.rawByte(',')
+	w.stringValue(c.CaptureTermination)
+	w.sep()
 	w.key("scope_mode")
-	w.stringLiteral(c.ScopeMode)
-	w.rawByte(',')
+	w.stringValue(c.ScopeMode)
+	w.sep()
 	w.key("scope_alias")
 	w.optString(c.ScopeAlias)
-	w.rawByte(',')
+	w.sep()
 	w.key("filter_status")
-	w.stringLiteral(c.FilterStatus)
-	w.rawByte(',')
+	w.stringValue(c.FilterStatus)
+	w.sep()
 	w.key("compact")
 	w.optBool(c.Compact)
-	w.rawByte(',')
+	w.sep()
 	w.key("normalized_severity")
 	w.optBool(c.NormalizedSeverity)
-	w.rawByte(',')
+	w.sep()
 	w.key("layers")
 	w.optBool(c.Layers)
-	w.rawByte(',')
+	w.sep()
 	w.key("fields_mode")
-	w.stringLiteral(c.FieldsMode)
-	w.rawByte(',')
+	w.stringValue(c.FieldsMode)
+	w.sep()
 	w.key("selected_fields")
+	w.enter()
 	w.rawByte('[')
 	for i, field := range c.SelectedFields {
-		if i > 0 {
-			w.rawByte(',')
+		if w.over {
+			return
 		}
-		w.stringLiteral(field)
+		if i > 0 {
+			w.sep()
+		}
+		w.stringValue(field)
 	}
-	w.rawByte(']')
-	w.rawByte(',')
+	w.end(']')
+	w.sep()
 	w.key("page_mode")
-	w.stringLiteral(c.PageMode)
-	w.rawByte(',')
+	w.stringValue(c.PageMode)
+	w.sep()
 	w.key("page_ordinal")
 	w.optInt(c.PageOrdinal)
-	w.rawByte(',')
+	w.sep()
 	w.key("pages_expected")
 	w.optInt(c.PagesExpected)
-	w.rawByte(',')
+	w.sep()
 	w.key("data_policy_ack")
-	w.stringLiteral(c.DataPolicyAck)
-	w.rawByte('}')
+	w.stringValue(c.DataPolicyAck)
+	w.end('}')
 }
 
 // input emits the closed input object in §11.2 order.
 func (w *nativeWriter) input(in NativeInput) {
+	if w.over {
+		return
+	}
+	w.enter()
 	w.rawByte('{')
 	w.key("source_alias")
-	w.stringLiteral(in.SourceAlias)
-	w.rawByte(',')
+	w.stringValue(in.SourceAlias)
+	w.sep()
 	w.key("native_format")
-	w.stringLiteral(in.NativeFormat)
-	w.rawByte(',')
+	w.stringValue(in.NativeFormat)
+	w.sep()
 	w.key("original_bytes")
 	w.uint(in.OriginalBytes)
-	w.rawByte(',')
+	w.sep()
 	w.key("local_eof")
-	w.rawLiteral("true")
-	w.rawByte(',')
+	w.rawLiteralValue("true")
+	w.sep()
 	w.key("original_hash")
-	w.rawLiteral("null")
-	w.rawByte('}')
+	w.rawLiteralValue("null")
+	w.end('}')
+}
+
+// rawLiteralValue reserves one value token and emits a raw canonical literal.
+func (w *nativeWriter) rawLiteralValue(s string) {
+	if w.over {
+		return
+	}
+	w.enter()
+	if w.over {
+		return
+	}
+	w.rawLiteral(s)
 }
 
 func (w *nativeWriter) optString(value *string) {
+	if w.over {
+		return
+	}
+	w.enter()
 	if value == nil {
 		w.rawLiteral("null")
 		return
@@ -535,6 +759,10 @@ func (w *nativeWriter) optString(value *string) {
 }
 
 func (w *nativeWriter) optBool(value *bool) {
+	if w.over {
+		return
+	}
+	w.enter()
 	if value == nil {
 		w.rawLiteral("null")
 		return
@@ -547,6 +775,10 @@ func (w *nativeWriter) optBool(value *bool) {
 }
 
 func (w *nativeWriter) optInt(value *int) {
+	if w.over {
+		return
+	}
+	w.enter()
 	if value == nil {
 		w.rawLiteral("null")
 		return
@@ -554,8 +786,18 @@ func (w *nativeWriter) optInt(value *int) {
 	w.put([]byte(strconv.FormatInt(int64(*value), 10)))
 }
 
-// value emits one projected data node.
+// value emits one projected data node and reserves its entry token. Once a
+// budget is exhausted it returns before entering any further node, so the
+// traversal of arrays and objects stops instead of walking the rest of the
+// source (§7.10).
 func (w *nativeWriter) value(v NativeValue) {
+	if w.over {
+		return
+	}
+	w.enter()
+	if w.over {
+		return
+	}
 	switch t := v.(type) {
 	case nil:
 		w.rawLiteral("null")
@@ -570,22 +812,27 @@ func (w *nativeWriter) value(v NativeValue) {
 			w.rawLiteral("false")
 		}
 	case NativeNumber:
-		w.rawLiteral("{\"number\":")
-		w.stringLiteral(t.Token)
-		w.rawByte('}')
+		w.rawByte('{')
+		w.key("number")
+		w.stringValue(t.Token)
+		w.end('}')
 	case NativeRedacted:
-		w.rawLiteral("{\"redacted\":")
-		w.stringLiteral(t.Kind)
-		w.rawByte('}')
+		w.rawByte('{')
+		w.key("redacted")
+		w.stringValue(t.Kind)
+		w.end('}')
 	case NativeArray:
 		w.rawByte('[')
 		for i, item := range t.Items {
+			if w.over {
+				return
+			}
 			if i > 0 {
-				w.rawByte(',')
+				w.sep()
 			}
 			w.value(item)
 		}
-		w.rawByte(']')
+		w.end(']')
 	case NativeObject:
 		w.object(t)
 	default:
@@ -595,8 +842,13 @@ func (w *nativeWriter) value(v NativeValue) {
 }
 
 // object emits a projected object with keys in canonical (lexicographic by
-// decoded UTF-8 bytes) order.
+// decoded UTF-8 bytes) order. The caller has already reserved the entry token.
+// It returns before allocating or sorting once a budget is exhausted, so no
+// make/sort runs for an object that will not be emitted (§7.10).
 func (w *nativeWriter) object(o NativeObject) {
+	if w.over {
+		return
+	}
 	order := make([]int, len(o.Keys))
 	for i := range order {
 		order[i] = i
@@ -604,13 +856,16 @@ func (w *nativeWriter) object(o NativeObject) {
 	sort.SliceStable(order, func(a, b int) bool { return o.Keys[order[a]] < o.Keys[order[b]] })
 	w.rawByte('{')
 	for i, idx := range order {
+		if w.over {
+			return
+		}
 		if i > 0 {
-			w.rawByte(',')
+			w.sep()
 		}
 		w.key(o.Keys[idx])
 		w.value(o.Values[idx])
 	}
-	w.rawByte('}')
+	w.end('}')
 }
 
 // NativeOriginLocator builds the §11.6 origin locator for a record.
@@ -620,6 +875,17 @@ func NativeOriginLocator(format string, ordinal int, start, end uint64) string {
 			strconv.FormatUint(start, 10) + "-" + strconv.FormatUint(end, 10)
 	}
 	return "json:/" + strconv.Itoa(ordinal)
+}
+
+// EncodeNativeRecordData returns the canonical bytes of one projected record
+// data value, using the same writer as the source and manifest. It is a
+// comparison representation for the acquisition repeat/drift guards (ADR-0028
+// §8.10–§8.11), not a wire artifact: it never carries context, acquired_at,
+// aliases, ordinals or locators of the original document.
+func EncodeNativeRecordData(v NativeValue) []byte {
+	var w nativeWriter
+	w.value(v)
+	return w.bytes()
 }
 
 // NativeValueSize returns the canonical byte length of one projected value,

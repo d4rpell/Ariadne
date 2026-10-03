@@ -44,16 +44,36 @@ func IsNativeCancelled(err *NativeError) bool {
 	return err != nil && err.Code == NativeCodeCancelled
 }
 
-// NativeBudget carries the additional acquisition limits as data. A zero field
-// means "no additional limit beyond the F1 limit already in force". Images,
-// Findings and Packages are the limits in force for this single admission call;
-// the connector lowers them to the remaining accumulated budget before each
-// page (§7.7).
+// NativeCodePageSizeExceeded is the admission-internal page-size signal of
+// §8.3. It is not a wire diagnostic of the native adapters and never appears in
+// a serialized artifact; the connector maps it to its own closed code
+// (page_size_exceeded). It exists so the per-page structural cap (50) is
+// distinguishable from the accumulated occurrence budget, respecting the §8.14
+// precedence without a second parser. Exported so the connector can recognize it
+// without parsing text.
+const NativeCodePageSizeExceeded = "admission_page_size_exceeded"
+
+// IsNativePageSizeExceeded reports whether err is the page-size admission signal.
+func IsNativePageSizeExceeded(err *NativeError) bool {
+	return err != nil && err.Code == NativeCodePageSizeExceeded
+}
+
+// NativeBudget carries the additional acquisition limits as data. When
+// LimitsActive is false (the offline F1 path) the F1 ceilings stay in force: a
+// smaller positive field lowers its ceiling, a zero field is ignored, and no
+// field can enlarge the F1 maximum. When LimitsActive is true the fields are the
+// exact ceilings in force for this admission call and zero means an active zero
+// ceiling, not "no additional limit"; they still can never enlarge the F1
+// maximum, so an active ceiling above it is clamped to F1. The connector lowers
+// them to the remaining accumulated budget before each page (§7.7) and sets
+// PageImages to the structural per-page cap of §8.3.
 type NativeBudget struct {
-	Tokens   uint64 // lexical tokens of this admission
-	Images   uint64 // image objects admitted by this call
-	Findings uint64 // vulnerability occurrences admitted by this call
-	Packages uint64 // package occurrences admitted by this call
+	LimitsActive bool   // true: the fields below are exact, active ceilings
+	Tokens       uint64 // lexical tokens of this admission
+	Images       uint64 // image objects admitted by this call
+	Findings     uint64 // vulnerability occurrences admitted by this call
+	Packages     uint64 // package occurrences admitted by this call
+	PageImages   uint64 // structural per-page image cap (§8.3); zero means no page cap
 }
 
 // NativeAdmission is the closed, side-effect-free admission control. Done, when

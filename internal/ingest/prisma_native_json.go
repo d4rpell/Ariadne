@@ -36,42 +36,46 @@ type nativeJSONParser struct {
 }
 
 // tokenCeiling is the effective lexical-token ceiling: the F1 limit, lowered by
-// an additional acquisition budget when one is set.
+// an additional acquisition budget when one is set. An active acquisition budget
+// can only lower the F1 ceiling, never enlarge it, and an active zero stays an
+// exact zero (not "no limit").
 func (p *nativeJSONParser) tokenCeiling() uint64 {
 	limit := p.tokenLimit
 	if limit == 0 {
 		limit = schema.NativeMaxTokens
 	}
-	if b := p.adm.Budget.Tokens; b > 0 && b < limit {
-		limit = b
-	}
-	return limit
+	return p.clampCeiling(limit, p.adm.Budget.Tokens)
 }
 
 // imageCeiling is the effective per-admission image ceiling.
 func (p *nativeJSONParser) imageCeiling() uint64 {
-	limit := uint64(schema.NativeMaxRootItems)
-	if b := p.adm.Budget.Images; b > 0 && b < limit {
-		limit = b
-	}
-	return limit
+	return p.clampCeiling(uint64(schema.NativeMaxRootItems), p.adm.Budget.Images)
 }
 
 // findingCeiling and packageCeiling are the effective occurrence ceilings.
 func (p *nativeJSONParser) findingCeiling() uint64 {
-	limit := uint64(schema.NativeMaxVulnsPerSource)
-	if b := p.adm.Budget.Findings; b > 0 && b < limit {
-		limit = b
-	}
-	return limit
+	return p.clampCeiling(uint64(schema.NativeMaxVulnsPerSource), p.adm.Budget.Findings)
 }
 
 func (p *nativeJSONParser) packageCeiling() uint64 {
-	limit := uint64(schema.NativeMaxPackagesPerSource)
-	if b := p.adm.Budget.Packages; b > 0 && b < limit {
-		limit = b
+	return p.clampCeiling(uint64(schema.NativeMaxPackagesPerSource), p.adm.Budget.Packages)
+}
+
+// clampCeiling applies an additional acquisition ceiling to an F1 ceiling. When
+// LimitsActive is true the acquisition ceiling is exact: it is always the
+// effective one, but it can never enlarge the F1 maximum. When it is false only
+// a smaller positive budget lowers the F1 ceiling (the offline paths).
+func (p *nativeJSONParser) clampCeiling(f1, active uint64) uint64 {
+	if p.adm.Budget.LimitsActive {
+		if active < f1 {
+			return active
+		}
+		return f1
 	}
-	return limit
+	if active > 0 && active < f1 {
+		return active
+	}
+	return f1
 }
 
 // checkpoint polls the caller's cancellation channel at a bounded point. It is
@@ -172,6 +176,13 @@ func admitNativeJSON(data []byte, adm NativeAdmission) (NativeDraft, *NativeErro
 		if p.peek() == ']' {
 			p.pos++
 			break
+		}
+		// §8.14 order: the structural page-size cap precedes the accumulated
+		// occurrence budget, so a page over the page cap is never misreported as an
+		// accumulated object_limit. The empty array above closes the sequence even
+		// after the accumulated budget is exhausted.
+		if cap := p.adm.Budget.PageImages; p.adm.Budget.LimitsActive && cap > 0 && p.rootItems >= cap {
+			return NativeDraft{}, p.pageSizeFailure()
 		}
 		if p.rootItems >= p.imageCeiling() {
 			return NativeDraft{}, p.fail(NativeCodeCollectionLimit)
@@ -472,6 +483,12 @@ func (p *nativeJSONParser) parseProjectedArray(path string, depth int) (NativeVa
 		if uint64(len(arr.Items)) >= cap {
 			return nil, p.fail(NativeCodeCollectionLimit)
 		}
+		// Reserve the source-level cardinality budgets before the next element is
+		// constructed, so an over-budget element never grows the projected tree
+		// (§7.7, §7.10).
+		if err := p.reserveCollection(path); err != nil {
+			return nil, err
+		}
 		p.skipWS()
 		start := p.pos
 		item, err := p.parseProjected(elemPath, elemNode, depth+1)
@@ -482,9 +499,7 @@ func (p *nativeJSONParser) parseProjectedArray(path string, depth int) (NativeVa
 			return nil, p.fail(NativeCodeRecordLimit)
 		}
 		arr.Items = append(arr.Items, item)
-		if err := p.countCollection(path); err != nil {
-			return nil, err
-		}
+		p.countCollection(path)
 		p.skipWS()
 		if p.eat(',') {
 			if err := p.tick(); err != nil {
@@ -533,22 +548,45 @@ func nativeArrayElementByteLimit(path string) int {
 	}
 }
 
-// countCollection enforces the source-level cardinality budgets of §6.2.
-func (p *nativeJSONParser) countCollection(arrayPath string) *NativeError {
+// countCollection increments the source-level cardinality counters of §6.2. The
+// ceilings are reserved before the element is built (reserveCollection), so this
+// only accounts the admitted element.
+func (p *nativeJSONParser) countCollection(arrayPath string) {
 	switch arrayPath {
 	case "vulnerabilities":
 		p.sourceVulns++
-		if p.sourceVulns > p.findingCeiling() {
-			return p.fail(NativeCodeCollectionLimit)
-		}
 	case "packages[].pkgs":
 		p.sourcePkgs++
 		p.imagePkgs++
-		if p.sourcePkgs > p.packageCeiling() || p.imagePkgs > schema.NativeMaxPackagesPerImage {
+	}
+}
+
+// reserveCollection applies the source-level cardinality budgets of §6.2 before
+// the next element is constructed. The ceilings are exact when the acquisition
+// budget is active, so a zero remaining budget rejects the next element.
+func (p *nativeJSONParser) reserveCollection(arrayPath string) *NativeError {
+	switch arrayPath {
+	case "vulnerabilities":
+		if p.sourceVulns >= p.findingCeiling() {
+			return p.fail(NativeCodeCollectionLimit)
+		}
+	case "packages[].pkgs":
+		if p.sourcePkgs >= p.packageCeiling() || p.imagePkgs >= schema.NativeMaxPackagesPerImage {
 			return p.fail(NativeCodeCollectionLimit)
 		}
 	}
 	return nil
+}
+
+// pageSizeFailure reports the §8.3 structural page-size signal. It is an
+// admission-internal code, not a wire diagnostic.
+func (p *nativeJSONParser) pageSizeFailure() *NativeError {
+	return &NativeError{
+		Code:        NativeCodePageSizeExceeded,
+		Phase:       NativePhaseAdmission,
+		OffsetSpace: NativeSpaceNative,
+		Offset:      uint64(p.pos),
+	}
 }
 
 func (p *nativeJSONParser) parseBoolValue() (NativeValue, *NativeError) {

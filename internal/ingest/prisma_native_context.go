@@ -84,6 +84,12 @@ func validNativeAlias(value string) bool {
 	return true
 }
 
+// ValidNativeAlias reports whether value satisfies the closed ASCII alias
+// grammar of ADR-0027 §5. It is exported so the API connector validates its
+// origin and scope aliases with the exact same grammar before using credentials
+// or the transport (ADR-0028 §4.3), without duplicating the rule.
+func ValidNativeAlias(value string) bool { return validNativeAlias(value) }
+
 // validateNativeContext enforces every domain and relation of §5 before any
 // reader consumes the source, for the 1.0 provenance version.
 func validateNativeContext(ctx NativeContext) *NativeError {

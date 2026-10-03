@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/d4rpell/Ariadne/internal/ingest"
 )
 
 // requiredDataPolicyAck is the F1 redaction policy acknowledgement that the
@@ -33,7 +35,9 @@ func validateConfig(cfg AcquisitionConfig) *AcquisitionError {
 	if len(cfg.CA) == 0 || len(cfg.CA) > maxCAContentBytes {
 		return acquireErr(CodeTLSConfigInvalid, PhaseConfig)
 	}
-	if cfg.OriginAlias == "" {
+	// The sanitized aliases destined for artifacts must satisfy the exact F1
+	// alias grammar before any credential or transport is used (§4.3).
+	if !ingest.ValidNativeAlias(cfg.OriginAlias) {
 		return acquireErr(CodeInvalidConfig, PhaseConfig)
 	}
 	if cfg.DataPolicyAck != requiredDataPolicyAck {
@@ -45,7 +49,7 @@ func validateConfig(cfg AcquisitionConfig) *AcquisitionError {
 			return acquireErr(CodeInvalidConfig, PhaseConfig)
 		}
 	case ScopeProjectSelect:
-		if !validProjectID(cfg.Project) || cfg.ScopeAlias == nil || *cfg.ScopeAlias == "" {
+		if !validProjectID(cfg.Project) || cfg.ScopeAlias == nil || !ingest.ValidNativeAlias(*cfg.ScopeAlias) {
 			return acquireErr(CodeInvalidConfig, PhaseConfig)
 		}
 	default:

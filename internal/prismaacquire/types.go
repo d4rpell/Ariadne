@@ -1,6 +1,10 @@
 package prismaacquire
 
-import "time"
+import (
+	"time"
+
+	"github.com/d4rpell/Ariadne/internal/normalize"
+)
 
 // Scope modes of ADR-0028 §4.4. Exactly two modes are admitted.
 const (
@@ -58,4 +62,64 @@ type Credential struct {
 	Token     string // bearer_supplied
 	Username  string // password_exchange
 	Password  string // password_exchange
+}
+
+// Termination, sequence-completeness, coverage, consistency and runtime-binding
+// literals of §10.2. They are separate dimensions and are never collapsed.
+const (
+	TerminationFinished = "finished"
+	TerminationAborted  = "aborted"
+	TerminationUnknown  = "unknown"
+
+	SequenceComplete = "complete"
+	SequencePartial  = "partial"
+	SequenceUnknown  = "unknown"
+
+	InventoryCoverageUnknown   = "unknown"
+	ConsistencyNotAtomic       = "not_atomic"
+	RuntimeBindingNotAttempted = "not_attempted"
+)
+
+// AttemptCounters reports the budgets an acquisition consumed (§7.4–§7.9).
+type AttemptCounters struct {
+	Total     int
+	Auth      int
+	ImageGET  int
+	BodyBytes uint64
+	Images    uint64
+	Findings  uint64
+	Packages  uint64
+	Tokens    uint64
+}
+
+// PageResult is one admitted page delivered in memory (§9.1, §10.1). The
+// artifacts and the native inventory are the only data of the page; no original
+// body, credential or transport metadata is retained.
+type PageResult struct {
+	Ordinal     int
+	Offset      int
+	SourceAlias string
+	AcquiredAt  string
+	Artifacts   normalize.NativeArtifacts
+	Inventory   normalize.NativeInventory
+}
+
+// AcquisitionResult is the typed, in-memory result of §10.1. It expresses the
+// four independent dimensions, the consumed counters, the admitted pages and
+// the acquisition diagnostics. It is not a new persistent format.
+type AcquisitionResult struct {
+	Selector             string
+	Version              string
+	Profile              string
+	OriginAlias          string
+	ScopeAlias           *string
+	AuthMode             string
+	Termination          string
+	SequenceCompleteness string
+	InventoryCoverage    string
+	Consistency          string
+	RuntimeBinding       string
+	Attempts             AttemptCounters
+	Pages                []PageResult
+	Diagnostics          []*AcquisitionError
 }
