@@ -1,6 +1,6 @@
 # ADR-0028: Optional Prisma API acquisition connector
 
-- **Status:** ratified by the owner (2026-10-02, decisions NE-N01..N07); an authorized fallback independent review closed with no open finding in three passes; the primary Astra review remains re-openable when external quota returns; not implemented (implementation requires a separate handoff and authorization).
+- **Status:** ratified by the owner (2026-10-02, decisions NE-N01..N07); implemented (task A2-08-F2), independently reviewed with **`apto` (0 P0/P1/P2/P3)** and published (2026-10-03); accepted by the owner (2026-10-03). Real-service compatibility remains **not verified**.
 - **Origin:** task A2-07-F2; the contract builds on the ratified offline ingestion scope of [ADR-0027](ADR-0027-native-prisma-report-ingestion.md).
 - **Relationships:** develops the network scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) (see its connector precision section). Follows the read-only network precedent of [ADR-0026](ADR-0026-optional-pod-collector.md) as a separate privilege root. Does not change the evidence bundle wire `0.2`, the `prisma-v1` input contract, the decision layers or the Kubernetes collector.
 
@@ -28,4 +28,4 @@ Another edition or release must be supported, a documented stable snapshot/curso
 
 ## Delivery status
 
-Registered in both layers on 2026-10-02 as a proposal after a no-open-finding fallback review. Implementation (task A2-08-F2) requires a separate executable handoff and explicit authorization. Ariadne is pre-alpha; nothing described here is implemented, and no distribution or release is authorized.
+Registered in both layers on 2026-10-02 as a proposal after a no-open-finding fallback review, and ratified by the owner the same day. The connector (task A2-08-F2) is **implemented**, independently reviewed with `apto` (0 P0/P1/P2/P3) and published on 2026-10-03; the owner accepted it on 2026-10-03. Real-service compatibility is **not verified**: without tenant access, support rests on public documentation and synthetic tests with in-memory transports. Ariadne is pre-alpha; no distribution of bundles or reports and no release is authorized.
