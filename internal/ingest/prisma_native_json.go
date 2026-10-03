@@ -29,6 +29,63 @@ type nativeJSONParser struct {
 	keyRaw      int
 	keyDecoded  int
 	stringRaw   int
+	// adm carries the acquisition control of the shared admission seam (§3.3).
+	// The zero value (no budget, nil Done) reproduces the offline 1.0 path
+	// exactly: the F1 limits are already in force and have no extra ceiling.
+	adm NativeAdmission
+}
+
+// tokenCeiling is the effective lexical-token ceiling: the F1 limit, lowered by
+// an additional acquisition budget when one is set.
+func (p *nativeJSONParser) tokenCeiling() uint64 {
+	limit := p.tokenLimit
+	if limit == 0 {
+		limit = schema.NativeMaxTokens
+	}
+	if b := p.adm.Budget.Tokens; b > 0 && b < limit {
+		limit = b
+	}
+	return limit
+}
+
+// imageCeiling is the effective per-admission image ceiling.
+func (p *nativeJSONParser) imageCeiling() uint64 {
+	limit := uint64(schema.NativeMaxRootItems)
+	if b := p.adm.Budget.Images; b > 0 && b < limit {
+		limit = b
+	}
+	return limit
+}
+
+// findingCeiling and packageCeiling are the effective occurrence ceilings.
+func (p *nativeJSONParser) findingCeiling() uint64 {
+	limit := uint64(schema.NativeMaxVulnsPerSource)
+	if b := p.adm.Budget.Findings; b > 0 && b < limit {
+		limit = b
+	}
+	return limit
+}
+
+func (p *nativeJSONParser) packageCeiling() uint64 {
+	limit := uint64(schema.NativeMaxPackagesPerSource)
+	if b := p.adm.Budget.Packages; b > 0 && b < limit {
+		limit = b
+	}
+	return limit
+}
+
+// checkpoint polls the caller's cancellation channel at a bounded point. It is
+// O(1). A nil channel means "not cancellable" and is skipped.
+func (p *nativeJSONParser) checkpoint() *NativeError {
+	if p.adm.Done == nil {
+		return nil
+	}
+	select {
+	case <-p.adm.Done:
+		return nativeCancelled
+	default:
+		return nil
+	}
 }
 
 // Native-per-artifact lexical budgets. The native admission path and the
@@ -76,21 +133,37 @@ func (p *nativeJSONParser) tickToken() *NativeError {
 }
 
 // parsePrismaNativeJSON admits one native JSON document and returns the derived
-// source, or a fatal diagnostic. The original bytes are never retained.
+// source, or a fatal diagnostic. It is the offline 1.0 entry point: it runs the
+// shared admission with no additional acquisition control and finalizes with the
+// JSON profile. The original bytes are never retained.
 func parsePrismaNativeJSON(data []byte, ctx NativeContext) (NativeSource, *NativeError) {
+	draft, err := admitNativeJSON(data, NativeAdmission{})
+	if err != nil {
+		return NativeSource{}, err
+	}
+	return draft.Source(jsonProfile(), ctx), nil
+}
+
+// admitNativeJSON is the single JSON admission shared by the offline adapters
+// and the acquisition connector (§3.3). It validates the document, walks it
+// against the closed disposition table, projects the conserved members and
+// returns a private draft with numeric accounting. The acquisition control
+// lowers the F1 ceilings and polls cancellation at bounded checkpoints; the zero
+// control reproduces the 1.0 behaviour byte for byte.
+func admitNativeJSON(data []byte, adm NativeAdmission) (NativeDraft, *NativeError) {
 	if !utf8.Valid(data) {
-		return NativeSource{}, nativeFailure(NativeCodeInvalidUTF8, NativePhaseAdmission, NativeSpaceNative, 0)
+		return NativeDraft{}, nativeFailure(NativeCodeInvalidUTF8, NativePhaseAdmission, NativeSpaceNative, 0)
 	}
 	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
-		return NativeSource{}, nativeFailure(NativeCodeInvalidJSON, NativePhaseAdmission, NativeSpaceNative, 0)
+		return NativeDraft{}, nativeFailure(NativeCodeInvalidJSON, NativePhaseAdmission, NativeSpaceNative, 0)
 	}
-	p := &nativeJSONParser{data: data}
+	p := &nativeJSONParser{data: data, adm: adm}
 	p.skipWS()
 	if !p.eat('[') {
-		return NativeSource{}, p.fail(NativeCodeInvalidJSON)
+		return NativeDraft{}, p.fail(NativeCodeInvalidJSON)
 	}
 	if err := p.tick(); err != nil {
-		return NativeSource{}, err
+		return NativeDraft{}, err
 	}
 	imageNode := schema.NativeNode{Kind: schema.NativeObject, Disposition: schema.NativeConserved}
 	var records []NativeRecord
@@ -100,17 +173,20 @@ func parsePrismaNativeJSON(data []byte, ctx NativeContext) (NativeSource, *Nativ
 			p.pos++
 			break
 		}
-		if p.rootItems >= schema.NativeMaxRootItems {
-			return NativeSource{}, p.fail(NativeCodeCollectionLimit)
+		if p.rootItems >= p.imageCeiling() {
+			return NativeDraft{}, p.fail(NativeCodeCollectionLimit)
+		}
+		if err := p.checkpoint(); err != nil {
+			return NativeDraft{}, err
 		}
 		start := p.pos
 		p.imagePkgs = 0
 		value, err := p.parseProjected("", imageNode, 2)
 		if err != nil {
-			return NativeSource{}, err
+			return NativeDraft{}, err
 		}
 		if err := checkImageScope(value); err != nil {
-			return NativeSource{}, err
+			return NativeDraft{}, err
 		}
 		end := p.pos
 		records = append(records, NativeRecord{
@@ -122,38 +198,44 @@ func parsePrismaNativeJSON(data []byte, ctx NativeContext) (NativeSource, *Nativ
 		})
 		p.rootItems++
 		if end-start > schema.NativeMaxImageObjectBytes {
-			return NativeSource{}, p.fail(NativeCodeRecordLimit)
+			return NativeDraft{}, p.fail(NativeCodeRecordLimit)
 		}
 		p.skipWS()
 		if p.peek() == ',' {
 			p.pos++
 			if err := p.tick(); err != nil {
-				return NativeSource{}, err
+				return NativeDraft{}, err
 			}
 			p.skipWS()
 			if p.peek() == ']' || p.peek() == ',' {
-				return NativeSource{}, p.fail(NativeCodeInvalidJSON)
+				return NativeDraft{}, p.fail(NativeCodeInvalidJSON)
 			}
 			continue
 		}
 		if p.peek() == ']' {
 			p.pos++
 			if err := p.tick(); err != nil {
-				return NativeSource{}, err
+				return NativeDraft{}, err
 			}
 			break
 		}
-		return NativeSource{}, p.fail(NativeCodeInvalidJSON)
+		return NativeDraft{}, p.fail(NativeCodeInvalidJSON)
 	}
 	p.skipWS()
 	if p.pos != len(p.data) {
-		return NativeSource{}, p.fail(NativeCodeInvalidJSON)
+		return NativeDraft{}, p.fail(NativeCodeInvalidJSON)
 	}
-	return NativeSource{
-		Profile: jsonProfile(),
-		Context: nativeContextClone(ctx),
-		Input:   NativeInput{SourceAlias: ctx.SourceAlias, NativeFormat: "json", OriginalBytes: uint64(len(data))},
-		Records: records,
+	return NativeDraft{
+		Format:        "json",
+		OriginalBytes: uint64(len(data)),
+		Records:       records,
+		Accounting: NativeAccounting{
+			Tokens:   p.tokens,
+			Bytes:    uint64(len(data)),
+			Images:   p.rootItems,
+			Findings: p.sourceVulns,
+			Packages: p.sourcePkgs,
+		},
 	}, nil
 }
 
@@ -234,10 +316,10 @@ func (p *nativeJSONParser) skipWS() {
 
 func (p *nativeJSONParser) tick() *NativeError {
 	p.tokens++
-	if p.tokens > schema.NativeMaxTokens {
+	if p.tokens > p.tokenCeiling() {
 		return p.fail(NativeCodeTokenLimit)
 	}
-	return nil
+	return p.checkpoint()
 }
 
 // parseProjected admits and projects one conserved node. Null is not accepted
@@ -456,13 +538,13 @@ func (p *nativeJSONParser) countCollection(arrayPath string) *NativeError {
 	switch arrayPath {
 	case "vulnerabilities":
 		p.sourceVulns++
-		if p.sourceVulns > schema.NativeMaxVulnsPerSource {
+		if p.sourceVulns > p.findingCeiling() {
 			return p.fail(NativeCodeCollectionLimit)
 		}
 	case "packages[].pkgs":
 		p.sourcePkgs++
 		p.imagePkgs++
-		if p.sourcePkgs > schema.NativeMaxPackagesPerSource || p.imagePkgs > schema.NativeMaxPackagesPerImage {
+		if p.sourcePkgs > p.packageCeiling() || p.imagePkgs > schema.NativeMaxPackagesPerImage {
 			return p.fail(NativeCodeCollectionLimit)
 		}
 	}

@@ -133,6 +133,7 @@ func BuildNativeManifest(source ingest.NativeSource, sourceHash string, sourceBy
 		Profile:       source.Profile,
 		Counts:        acc.counts,
 		Limitations:   orderedLimitations(acc.limitations),
+		Version:       source.Version,
 	}
 	losses, err := orderedLosses(acc.losses)
 	if err != nil {
@@ -667,7 +668,7 @@ func ReplayPrismaNative(source, manifest, digest io.Reader, artifactSelector, ar
 			Code: ingest.NativeCodeUnsupportedSelector, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
 		}
 	}
-	if artifactVersion != schema.NativeFormatVersion {
+	if artifactVersion != schema.NativeFormatVersion && artifactVersion != schema.NativeFormatVersionV11 {
 		return NativeInventory{}, &ingest.NativeError{
 			Code: ingest.NativeCodeUnsupportedVersion, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
 		}
@@ -696,6 +697,13 @@ func ReplayPrismaNative(source, manifest, digest io.Reader, artifactSelector, ar
 	declared, manifestBytes, err := ingest.ParseNativeManifestBytes(manifestBytes)
 	if err != nil {
 		return NativeInventory{}, err
+	}
+	// The requested version must match the version carried by both artifacts, so
+	// a 1.1 source is never replayed as 1.0 or the reverse (§9.5).
+	if parsed.Version != artifactVersion || declared.Version != artifactVersion {
+		return NativeInventory{}, &ingest.NativeError{
+			Code: ingest.NativeCodeUnsupportedVersion, Phase: ingest.NativePhaseContext, OffsetSpace: ingest.NativeSpaceNone,
+		}
 	}
 	if !validManifestSidecar(digestBytes) {
 		return NativeInventory{}, &ingest.NativeError{
@@ -737,6 +745,8 @@ func replayFailure(code, space string) *ingest.NativeError {
 // disagree. source_hash is handled separately as a `hash_mismatch`.
 func firstDiscrepantManifestMember(a, b ingest.NativeManifest) (string, bool) {
 	switch {
+	case a.Version != b.Version:
+		return "version", true
 	case a.SourceBytes != b.SourceBytes:
 		return "source_bytes", true
 	case a.OriginalBytes != b.OriginalBytes:

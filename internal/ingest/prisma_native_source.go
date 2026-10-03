@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"unicode/utf8"
+
+	"github.com/d4rpell/Ariadne/internal/schema"
 )
 
 // Wire model and canonical serialization of ADR-0027 §11.2–§11.6. The native
@@ -78,12 +80,14 @@ type NativeRecord struct {
 	Data          NativeValue
 }
 
-// NativeSource is the native-source.json wire of §11.2.
+// NativeSource is the native-source.json wire of §11.2. Version is the artifact
+// provenance version (ADR-0028 §9.5); empty means the 1.0 offline version.
 type NativeSource struct {
 	Profile NativeProfile
 	Context NativeContext
 	Input   NativeInput
 	Records []NativeRecord
+	Version string
 }
 
 // NativeCounts is the closed counts object of §11.7.
@@ -103,7 +107,8 @@ type NativeLoss struct {
 	Occurrences uint64
 }
 
-// NativeManifest is the native-manifest.json wire of §11.7.
+// NativeManifest is the native-manifest.json wire of §11.7. Version is the
+// artifact provenance version (ADR-0028 §9.5); empty means the 1.0 version.
 type NativeManifest struct {
 	SourceHash    string
 	SourceBytes   uint64
@@ -112,6 +117,17 @@ type NativeManifest struct {
 	Counts        NativeCounts
 	Losses        []NativeLoss
 	Limitations   []string
+	Version       string
+}
+
+// canonicalArtifactVersion returns the serialized artifact version: the explicit
+// value when set, or the 1.0 offline version when empty. It never selects a
+// version by inspection; the caller chooses it.
+func canonicalArtifactVersion(v string) string {
+	if v == "" {
+		return schema.NativeFormatVersion
+	}
+	return v
 }
 
 // EncodeNativeSource serializes the source with §11.4 canonical rules.
@@ -138,7 +154,7 @@ func writeNativeSource(w *nativeWriter, src NativeSource) {
 	w.stringLiteral("prisma-native-source-v1")
 	w.rawByte(',')
 	w.key("version")
-	w.stringLiteral("1.0")
+	w.stringLiteral(canonicalArtifactVersion(src.Version))
 	w.rawByte(',')
 	w.key("profile")
 	w.profile(src.Profile)
@@ -204,7 +220,7 @@ func writeNativeManifest(w *nativeWriter, man NativeManifest) {
 	w.stringLiteral("prisma-native-manifest-v1")
 	w.rawByte(',')
 	w.key("version")
-	w.stringLiteral("1.0")
+	w.stringLiteral(canonicalArtifactVersion(man.Version))
 	w.rawByte(',')
 	w.key("source_name")
 	w.stringLiteral("native-source.json")

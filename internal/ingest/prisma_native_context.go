@@ -1,6 +1,10 @@
 package ingest
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/d4rpell/Ariadne/internal/schema"
+)
 
 // NativeContext is the explicit operator context of ADR-0027 §5. Every member
 // is obligatory: optional values use nil, they are never omitted and never take
@@ -81,8 +85,17 @@ func validNativeAlias(value string) bool {
 }
 
 // validateNativeContext enforces every domain and relation of §5 before any
-// reader consumes the source. It returns nil when the context is admissible.
+// reader consumes the source, for the 1.0 provenance version.
 func validateNativeContext(ctx NativeContext) *NativeError {
+	return validateNativeContextVersion(ctx, schema.NativeFormatVersion)
+}
+
+// validateNativeContextVersion enforces §5 with the acquisition provenance
+// admitted by the artifact version (ADR-0028 §9.5): 1.0 admits the offline
+// kinds (operator_export, synthetic_fixture) and rejects compute_api; 1.1 admits
+// only compute_api. Every other member keeps its F1 grammar, types, limits and
+// coherence relations unchanged.
+func validateNativeContextVersion(ctx NativeContext, version string) *NativeError {
 	fail := func() *NativeError {
 		return nativeFailure(NativeCodeInvalidContext, NativePhaseContext, NativeSpaceNone, 0)
 	}
@@ -117,7 +130,14 @@ func validateNativeContext(ctx NativeContext) *NativeError {
 		return fail()
 	}
 	switch ctx.AcquisitionKind {
-	case "operator_export", "synthetic_fixture":
+	case schema.NativeAcquisitionKindExport, schema.NativeAcquisitionKindSynthetic:
+		if version == schema.NativeFormatVersionV11 {
+			return fail()
+		}
+	case schema.NativeAcquisitionKindAPI:
+		if version != schema.NativeFormatVersionV11 {
+			return fail()
+		}
 	default:
 		return fail()
 	}

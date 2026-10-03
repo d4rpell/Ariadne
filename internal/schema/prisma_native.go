@@ -29,7 +29,19 @@ const (
 	NativeSourceFormat   = "prisma-native-source-v1"
 	NativeManifestFormat = "prisma-native-manifest-v1"
 	NativeFormatVersion  = "1.0"
-	NativeSourceName     = "native-source.json"
+	// NativeFormatVersionV11 is the artifact provenance version reserved, by
+	// ADR-0028 §9.5, for compute_api sources and manifests. The version 1.0
+	// artifacts keep their bytes unchanged.
+	NativeFormatVersionV11 = "1.1"
+	NativeSourceName       = "native-source.json"
+)
+
+// Acquisition provenance literals of ADR-0027 §5 and ADR-0028 §9.5. Version 1.0
+// admits the offline kinds; version 1.1 admits only compute_api.
+const (
+	NativeAcquisitionKindExport    = "operator_export"
+	NativeAcquisitionKindSynthetic = "synthetic_fixture"
+	NativeAcquisitionKindAPI       = "compute_api"
 )
 
 // Native budget limits of ADR-0027 §6.2. Each guard is checked before the

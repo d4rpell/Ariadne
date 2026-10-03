@@ -702,7 +702,7 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 	}
 	format, _ := t.member("format")
 	version, _ := t.member("version")
-	if format.str != schema.NativeSourceFormat || version.str != schema.NativeFormatVersion {
+	if format.str != schema.NativeSourceFormat || !validArtifactVersion(version.str) {
 		return NativeSource{}, artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	profileNode, _ := t.member("profile")
@@ -710,8 +710,13 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 	if err != nil {
 		return NativeSource{}, err
 	}
+	if version.str == schema.NativeFormatVersionV11 && profile.Selector != schema.NativeJSONSelector {
+		// The 1.1 provenance is reserved to the selected JSON profile (§9.5); a
+		// CSV artifact presented under it is rejected.
+		return NativeSource{}, artifactError(NativeCodeInvalidArtifact, 0)
+	}
 	contextNode, _ := t.member("context")
-	context, err := readNativeContextTree(contextNode)
+	context, err := readNativeContextTree(contextNode, version.str)
 	if err != nil {
 		return NativeSource{}, err
 	}
@@ -732,7 +737,13 @@ func readNativeSourceTree(t nativeTree) (NativeSource, *NativeError) {
 		}
 		records = append(records, record)
 	}
-	return NativeSource{Profile: profile, Context: context, Input: input, Records: records}, nil
+	return NativeSource{Profile: profile, Context: context, Input: input, Records: records, Version: version.str}, nil
+}
+
+// validArtifactVersion reports whether v is one of the artifact provenance
+// versions of ADR-0028 §9.5.
+func validArtifactVersion(v string) bool {
+	return v == schema.NativeFormatVersion || v == schema.NativeFormatVersionV11
 }
 
 func readNativeProfileTree(t nativeTree, space string) (NativeProfile, *NativeError) {
@@ -754,7 +765,7 @@ func readNativeProfileTree(t nativeTree, space string) (NativeProfile, *NativeEr
 	return profile, nil
 }
 
-func readNativeContextTree(t nativeTree) (NativeContext, *NativeError) {
+func readNativeContextTree(t nativeTree, version string) (NativeContext, *NativeError) {
 	names := []string{
 		"origin_alias", "source_alias", "declared_edition", "declared_release",
 		"version_basis", "report_kind", "acquisition_kind", "acquired_at",
@@ -799,7 +810,7 @@ func readNativeContextTree(t nativeTree) (NativeContext, *NativeError) {
 	ctx.PageOrdinal = optIntFromTree(get("page_ordinal"))
 	ctx.PagesExpected = optIntFromTree(get("pages_expected"))
 	ctx.DataPolicyAck = get("data_policy_ack").str
-	if err := validateNativeContext(ctx); err != nil {
+	if err := validateNativeContextVersion(ctx, version); err != nil {
 		return NativeContext{}, artifactError(NativeCodeInvalidArtifact, 0)
 	}
 	return ctx, nil
@@ -908,7 +919,7 @@ func readNativeManifestTree(t nativeTree) (NativeManifest, *NativeError) {
 	originalBytesNode, _ := t.member("original_bytes")
 	originalHash, _ := t.member("original_hash")
 	manBad := func() *NativeError { return artifactErrorSpace(NativeCodeInvalidArtifact, NativeSpaceManifest, 0) }
-	if format.str != schema.NativeManifestFormat || version.str != schema.NativeFormatVersion || name.str != schema.NativeSourceName {
+	if format.str != schema.NativeManifestFormat || !validArtifactVersion(version.str) || name.str != schema.NativeSourceName {
 		return NativeManifest{}, manBad()
 	}
 	if !validSourceHashLiteral(hash.str) {
@@ -958,6 +969,7 @@ func readNativeManifestTree(t nativeTree) (NativeManifest, *NativeError) {
 	return NativeManifest{
 		SourceHash: hash.str, SourceBytes: sourceBytes, OriginalBytes: originalBytes,
 		Profile: profile, Counts: counts, Losses: losses, Limitations: limitations,
+		Version: version.str,
 	}, nil
 }
 
@@ -1106,7 +1118,10 @@ func ValidateNativeSource(src NativeSource) *NativeError {
 	if !(src.Profile == jsonProfile() || src.Profile == csvProfile()) {
 		return artifactError(NativeCodeInvalidArtifact, 0)
 	}
-	if err := validateNativeContext(src.Context); err != nil {
+	if canonicalArtifactVersion(src.Version) == schema.NativeFormatVersionV11 && src.Profile != jsonProfile() {
+		return artifactError(NativeCodeInvalidArtifact, 0)
+	}
+	if err := validateNativeContextVersion(src.Context, canonicalArtifactVersion(src.Version)); err != nil {
 		return err
 	}
 	for _, record := range src.Records {
