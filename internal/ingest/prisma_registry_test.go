@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -227,5 +228,87 @@ func TestPrismaRegistryManifestRejectsFamilyVersionMismatch(t *testing.T) {
 	}
 	if _, _, err := ParseNativeManifestBytes(tampered); err == nil || err.Code != NativeCodeInvalidArtifact {
 		t.Fatalf("err = %v, want invalid_artifact", err)
+	}
+}
+
+// TestPrismaRegistryVectorIsDeployedWithDeclaredDeltas checks the registry source
+// wire byte for byte: it is exactly the deployed JSON source of ADR-0027 §11.12.1
+// with the declared family substitutions (format, version, profile fields,
+// report_kind). This is the registry 2.0 literal vector, adapted not copied.
+func TestPrismaRegistryVectorIsDeployedWithDeclaredDeltas(t *testing.T) {
+	payload := `[{"type":"image","packages":[],"vulnerabilities":[]}]`
+	dep, err := ParsePrismaNative(strings.NewReader(payload),
+		schema.NativeJSONSelector, schema.NativeInputVersion, schema.NativeJSONProfile, validCtx())
+	if err != nil {
+		t.Fatalf("deployed parse: %v", err)
+	}
+	depBytes := EncodeNativeSource(dep)
+	if len(depBytes) != 1187 {
+		t.Fatalf("deployed source length = %d, want the F1 §11.12.1 vector (1187)", len(depBytes))
+	}
+	reg, err := ParsePrismaNative(strings.NewReader(payload),
+		schema.NativeRegistryJSONSelector, schema.NativeRegistryInputVersion, schema.NativeRegistryJSONProfile, registryTestContext())
+	if err != nil {
+		t.Fatalf("registry parse: %v", err)
+	}
+	got := string(EncodeNativeSource(reg))
+	want := string(depBytes)
+	for _, r := range [][2]string{
+		{`"format":"` + schema.NativeSourceFormat + `"`, `"format":"` + schema.NativeRegistrySourceFormat + `"`},
+		{`"version":"` + schema.NativeFormatVersion + `"`, `"version":"` + schema.NativeRegistryInputVersion + `"`},
+		{`"selector":"` + schema.NativeJSONSelector + `"`, `"selector":"` + schema.NativeRegistryJSONSelector + `"`},
+		{`"input_version":"` + schema.NativeInputVersion + `"`, `"input_version":"` + schema.NativeRegistryInputVersion + `"`},
+		{`"name":"` + schema.NativeJSONProfile + `"`, `"name":"` + schema.NativeRegistryJSONProfile + `"`},
+		{`"adapter_semantics":"` + schema.NativeAdapterSemantics + `"`, `"adapter_semantics":"` + schema.NativeRegistryAdapterSemantics + `"`},
+		{`"report_kind":"` + schema.NativeReportKindDeployed + `"`, `"report_kind":"` + schema.NativeReportKindRegistry + `"`},
+	} {
+		next := strings.Replace(want, r[0], r[1], 1)
+		if next == want {
+			t.Fatalf("substitution did not apply: %s", r[0])
+		}
+		want = next
+	}
+	if got != want {
+		t.Fatalf("registry source is not the deployed vector with declared deltas:\n got %s\nwant %s", got, want)
+	}
+	// Locked registry 2.0 literal vector, derived independently (deployed §11.12.1
+	// vector + the documented deltas): 1209 bytes.
+	if len(got) != 1209 {
+		t.Fatalf("registry source length = %d, want 1209", len(got))
+	}
+	if h := HashNativeSource([]byte(got)); h != "sha256:e2a47182d4812e4566a1de737b1245ac5aae94f5636347e4c09473613b7adfe2" {
+		t.Fatalf("registry source hash = %s, want sha256:e2a47182d4812e4566a1de737b1245ac5aae94f5636347e4c09473613b7adfe2", h)
+	}
+}
+
+// TestPrismaRegistryObjectMemberBoundary checks the 128-member limit inside an
+// excluded subtree (history): 127/128 admitted, 129 rejected.
+func TestPrismaRegistryObjectMemberBoundary(t *testing.T) {
+	build := func(n int) string {
+		var b strings.Builder
+		b.WriteString(`[{"type":"image","history":{`)
+		for i := 0; i < n; i++ {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(`"k`)
+			b.WriteString(strconv.Itoa(i))
+			b.WriteString(`":0`)
+		}
+		b.WriteString(`}}]`)
+		return b.String()
+	}
+	for _, tc := range []struct {
+		n  int
+		ok bool
+	}{{127, true}, {128, true}, {129, false}} {
+		_, err := ParsePrismaNative(strings.NewReader(build(tc.n)),
+			schema.NativeRegistryJSONSelector, schema.NativeRegistryInputVersion, schema.NativeRegistryJSONProfile, registryTestContext())
+		if tc.ok && err != nil {
+			t.Fatalf("n=%d rejected: %v", tc.n, err)
+		}
+		if !tc.ok && (err == nil || err.Code != NativeCodeMemberLimit) {
+			t.Fatalf("n=%d: err = %v, want member_limit", tc.n, err)
+		}
 	}
 }
