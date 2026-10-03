@@ -109,3 +109,23 @@ func TestA208F2ReplayRejectsVersionMix(t *testing.T) {
 		t.Fatalf("1.0 artifacts as 1.1: err = %v, want %s", err, ingest.NativeCodeUnsupportedVersion)
 	}
 }
+
+// TestA208F2ReplayRecomputesManifest asserts a manifest whose facts were tampered
+// while its hashes were recomputed is still rejected: the hashes matching is not
+// a substitute for recomputing the semantics from the source (M20).
+func TestA208F2ReplayRecomputesManifest(t *testing.T) {
+	art := a208F2APIArtifacts(t)
+	declared, _, err := ingest.ParseNativeManifestBytes(art.Manifest)
+	if err != nil {
+		t.Fatalf("manifest parse failed: %v", err)
+	}
+	declared.Counts.Records++
+	tampered := ingest.EncodeNativeManifest(declared)
+	digest := ingest.NativeManifestSidecar(ingest.HashNativeManifest(tampered))
+	if _, rerr := ReplayPrismaNative(
+		bytes.NewReader(art.Source), bytes.NewReader(tampered), bytes.NewReader(digest),
+		schema.NativeSourceFormat, schema.NativeFormatVersionV11,
+	); rerr == nil || rerr.Code != ingest.NativeCodeManifestMismatch {
+		t.Fatalf("tampered manifest: err = %v, want %s", rerr, ingest.NativeCodeManifestMismatch)
+	}
+}
