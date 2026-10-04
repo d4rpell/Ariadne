@@ -110,8 +110,8 @@ func TestA108ImportBoundaryControls(t *testing.T) {
 				t.Fatalf("the %s boundary is no longer declared", expected)
 			}
 		}
-		if len(importBoundaries) != 10 {
-			t.Fatalf("importBoundaries has %d entries, want the ten declared roots", len(importBoundaries))
+		if len(importBoundaries) != 11 {
+			t.Fatalf("importBoundaries has %d entries, want the eleven declared roots", len(importBoundaries))
 		}
 	})
 

@@ -16,7 +16,7 @@ import (
 const f2ConnectorPackage = "github.com/d4rpell/Ariadne/internal/prismaacquire"
 
 func TestA208F2ImportBoundaryRoots(t *testing.T) {
-	t.Run("ten_unique_roots", func(t *testing.T) {
+	t.Run("eleven_unique_roots", func(t *testing.T) {
 		declared := map[string]boundaryDeclaration{}
 		for _, boundary := range importBoundaries {
 			if _, repeated := declared[boundary.name]; repeated {
@@ -24,8 +24,8 @@ func TestA208F2ImportBoundaryRoots(t *testing.T) {
 			}
 			declared[boundary.name] = boundary
 		}
-		if len(importBoundaries) != 10 {
-			t.Fatalf("importBoundaries has %d entries, want ten", len(importBoundaries))
+		if len(importBoundaries) != 11 {
+			t.Fatalf("importBoundaries has %d entries, want eleven", len(importBoundaries))
 		}
 		connector, present := declared["prismaacquire"]
 		if !present {

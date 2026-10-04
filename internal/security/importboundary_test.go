@@ -41,8 +41,12 @@ type boundaryDeclaration struct {
 	dir    string
 	core   bool
 	strict bool
-	exact  []string
-	trees  []string
+	// stdlibOnly marks the one root (internal/casefile, ADR-0030 §6) whose
+	// closure may reach no local package at all; every import must be standard
+	// library inside the root's own allowlist.
+	stdlibOnly bool
+	exact      []string
+	trees      []string
 	// graphExact and graphTrees narrow the transitive `go list -deps` pass when
 	// the standard library's own internals would trip a prohibition that is only
 	// meant for this project's sources: `os` needs `syscall` and `unsafe`, and
@@ -193,6 +197,24 @@ var importBoundaries = []boundaryDeclaration{
 		networkDirs: []string{"internal/prismaacquire"},
 		bannedLocal: connectorBannedLocal,
 	},
+	// Governance decision records (ADR-0030). This is the eleventh root and the
+	// only stdlib-only one: internal/casefile may import neither another local
+	// package nor any standard-library package outside its own ten-entry list.
+	// No network, no os, no time and no fmt, in the sources, the direct scan,
+	// the graph pass and the closure alike.
+	{
+		name:        "casefile",
+		target:      "../casefile",
+		dir:         "internal/casefile",
+		strict:      true,
+		stdlibOnly:  true,
+		exact:       []string{"os", "os/exec", "net", "time", "fmt", "log", "crypto/rand", "math/rand", "plugin", "unsafe", "syscall", "C"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		allowlist:   casefileStdlibAllowlist,
+		bannedLocal: offlineRootBannedLocal,
+	},
 }
 
 // adapterRoots are the boundary names whose closure uses the independent
@@ -266,6 +288,7 @@ func TestImportBoundary(t *testing.T) {
 				dir:             boundary.dir,
 				core:            boundary.core,
 				strict:          boundary.strict,
+				stdlibOnly:      boundary.stdlibOnly,
 				exact:           boundary.exact,
 				trees:           boundary.trees,
 				allowlist:       allowlistFor(boundary),

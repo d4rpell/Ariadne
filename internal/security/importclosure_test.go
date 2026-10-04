@@ -36,8 +36,13 @@ type closurePolicy struct {
 	dir    string
 	core   bool
 	strict bool
-	exact  []string
-	trees  []string
+	// stdlibOnly marks the one root (internal/casefile, ADR-0030 §6) that may
+	// import nothing local at all: only the standard library, and only the
+	// packages of its own allowlist. The flag never widens a policy; it only
+	// refuses the local branch this analyzer would otherwise traverse.
+	stdlibOnly bool
+	exact      []string
+	trees      []string
 	// allowlist, when non-nil, replaces coreStdlibAllowlist for this policy. The
 	// sanitized PodList adapter roots (ADR-0025 A.11.3) need a policy of their
 	// own: the core list plus regexp and net/netip, without touching the
@@ -84,6 +89,24 @@ var collectorStdlibAllowlist = append(append([]string{}, adapterStdlibAllowlist.
 // and leaking the permission to a local helper is refused because it is granted
 // per package in networkPackages.
 var connectorStdlibAllowlist = append(append([]string{}, adapterStdlibAllowlist...), "context", "crypto/tls", "crypto/x509", "net", "net/http", "net/url")
+
+// casefileStdlibAllowlist is the independent stdlib-only policy of
+// internal/casefile (ADR-0030 §6.1): exactly the ten packages the ratified
+// contract admits — no network, no os, no time, no fmt and no other local or
+// external package, directly or through a helper. It shares nothing mutable
+// with any other list.
+var casefileStdlibAllowlist = []string{
+	"bytes",
+	"crypto/sha256",
+	"encoding/hex",
+	"errors",
+	"io",
+	"reflect",
+	"strconv",
+	"strings",
+	"unicode",
+	"unicode/utf8",
+}
 
 // collectorBannedLocal is the closed set of package paths forbidden in the
 // sources of every local package of the collector closure. It covers the
@@ -293,6 +316,10 @@ func analyzeClosure(t *testing.T, root string, policy closurePolicy) []closureFi
 				}
 				switch {
 				case importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/"):
+					if policy.stdlibOnly {
+						findings = append(findings, closureFinding{chain: location, detail: "local import is not permitted by the stdlib-only profile: " + importPath})
+						continue
+					}
 					target, err := localDir(root, strings.TrimPrefix(strings.TrimPrefix(importPath, modulePath), "/"))
 					if err != nil {
 						// The reason travels with the finding: a link, an escape or an
