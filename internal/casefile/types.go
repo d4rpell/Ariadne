@@ -6,8 +6,9 @@
 //
 // The vocabulary is exactly accepted, deferred and rejected. The absence of a
 // decision is the absence of a record, never a record of its own. Expiry and
-// supersession carry as declared data only: this package implements no
-// lifecycle, no current-decision view and no exception recommendation.
+// supersession carry as declared data in the record; the derived validity view
+// over an admitted book lives in assess.go (ADR-0031, task A3-02). This package
+// implements no exception recommendation.
 package casefile
 
 // Format identifiers of the artifact family. Only the exact combination of
