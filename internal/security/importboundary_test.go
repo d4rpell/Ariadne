@@ -93,6 +93,21 @@ var importBoundaries = []boundaryDeclaration{
 		trees:       []string{"os/exec"},
 		bannedLocal: offlineRootBannedLocal,
 	},
+	// Interoperability exports (ADR-0032). This is the twelfth root: an offline
+	// projection with no process execution, no network and no dependence on the
+	// live collector or the Prisma API connector, in the sources, the direct scan
+	// and the closure alike. It is stricter than the report root beside it so the
+	// contract's "no network" is enforced, not merely asserted.
+	{
+		name:        "interop",
+		target:      "../interop",
+		dir:         "internal/interop",
+		exact:       []string{"net", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"net/http", "k8s.io/client-go"},
+		graphExact:  []string{"net", "os/exec", "plugin"},
+		graphTrees:  []string{"net/http", "k8s.io/client-go"},
+		bannedLocal: offlineRootBannedLocal,
+	},
 	{
 		name:   "cli",
 		target: "../../cmd/ariadne",

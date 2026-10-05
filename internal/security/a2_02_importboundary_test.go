@@ -22,8 +22,8 @@ func TestA202ImportBoundaryRoots(t *testing.T) {
 			}
 			declared[boundary.name] = boundary
 		}
-		if len(importBoundaries) != 11 {
-			t.Fatalf("importBoundaries has %d entries, want the eleven declared roots", len(importBoundaries))
+		if len(importBoundaries) != 12 {
+			t.Fatalf("importBoundaries has %d entries, want the twelve declared roots", len(importBoundaries))
 		}
 		collector, present := declared["collector"]
 		if !present {

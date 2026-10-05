@@ -23,8 +23,8 @@ func TestCasefileImportPolicy(t *testing.T) {
 			}
 			declared[boundary.name] = boundary
 		}
-		if len(importBoundaries) != 11 {
-			t.Fatalf("importBoundaries has %d entries, want eleven", len(importBoundaries))
+		if len(importBoundaries) != 12 {
+			t.Fatalf("importBoundaries has %d entries, want twelve", len(importBoundaries))
 		}
 		casefile, present := declared["casefile"]
 		if !present {
