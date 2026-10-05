@@ -1,0 +1,14 @@
+// Package interop renders deterministic OpenVEX and SARIF interoperability
+// documents from an already-computed evaluation result and the canonical bundle
+// whose projection hash the result carries (ADR-0032). It re-evaluates nothing,
+// opens no path, reaches no network and executes no process: it re-validates the
+// form it needs, contrasts the bundle hash and returns the bytes the caller
+// decides where to write.
+//
+// The standard fields carry only what Ariadne can substantiate from the result;
+// local extensions are omitted (OpenVEX) or placed in the standard extension
+// mechanism under a namespaced key (SARIF). These documents are not the evidence
+// bundle, not a decision record and not a risk acceptance, and none of them
+// proves the correctness of the conclusion it presents. Distribution of the
+// exported documents is not authorized by this contract.
+package interop
