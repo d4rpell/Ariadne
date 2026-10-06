@@ -1,6 +1,6 @@
 # ADR-0019: Operating modes and persistent tracking
 
-- **Status:** **proposed (2026-09-27); pending review and ratification; not implemented.** This record is a proposal: nothing in it is decided until the owner ratifies it through a separate, explicit decision.
+- **Status:** **superseded by ADR-0034 (2026-10-06)**, which closes Q-01..Q-08. Retained as history: it was a proposal (2026-09-27), pending review and ratification, not implemented.
 - **Date:** 2026-09-27.
 - **Scope:** propose two ways of using the same product (occasional runs and continuous tracking), the transition between them, the temporal meaning of observations, what charts may honestly show, a hot/warm/cold storage evolution and exports for external corporate policies. It complements the optional governance platform record (ADR-0017); it supersedes nothing.
 - **Related records:** depends on ADR-0002, ADR-0003, ADR-0004, ADR-0006, ADR-0007, ADR-0008, ADR-0010, ADR-0012, ADR-0013, ADR-0015, ADR-0016 and ADR-0018; complements ADR-0017. No accepted record is superseded.
