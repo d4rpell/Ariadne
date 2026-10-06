@@ -15,6 +15,7 @@ const (
 	CodeInvalidBundle      ErrorCode = "invalid_bundle"
 	CodeBundleHashMismatch ErrorCode = "bundle_hash_mismatch"
 	CodeInvalidIssuer      ErrorCode = "invalid_issuer"
+	CodeInvalidRemediation ErrorCode = "invalid_remediation"
 	CodeRenderFailure      ErrorCode = "render_failure"
 )
 

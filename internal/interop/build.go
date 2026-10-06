@@ -171,6 +171,83 @@ func validateIssuer(issuer Issuer) error {
 	return nil
 }
 
+// validateCSAFIssuer checks the CSAF document identity supplied by the caller:
+// the tracking id (non-empty, no control character), the publisher name and its
+// namespace IRI, and the canonical issuance instant. It is an Ariadne policy,
+// not a CSAF rule, except where the CSAF schema requires the field to be present.
+func validateCSAFIssuer(issuer CSAFIssuer) error {
+	if !boundedAuthor(issuer.DocumentID) {
+		return problem(CodeInvalidIssuer)
+	}
+	if !boundedAuthor(issuer.PublisherName) {
+		return problem(CodeInvalidIssuer)
+	}
+	if !isIRI(issuer.PublisherNamespace) {
+		return problem(CodeInvalidIssuer)
+	}
+	if !canonicalInstant(issuer.IssuedAt) {
+		return problem(CodeInvalidIssuer)
+	}
+	return nil
+}
+
+// validateCSAFRemediation enforces the closed contract of the action statement:
+// an affected product requires a caller-supplied remediation with a category
+// from the CSAF enum and non-empty details; any other status requires none. A
+// supplied remediation outside affected is a caller error, not silently ignored.
+func validateCSAFRemediation(status contract.ProductStatus, remediation *CSAFRemediation) error {
+	if status == contract.ProductAffected {
+		if remediation == nil {
+			return problem(CodeInvalidRemediation)
+		}
+		if !isCSAFRemediationCategory(remediation.Category) {
+			return problem(CodeInvalidRemediation)
+		}
+		if !boundedAuthor(remediation.Details) {
+			return problem(CodeInvalidRemediation)
+		}
+		return nil
+	}
+	if remediation != nil {
+		return problem(CodeInvalidRemediation)
+	}
+	return nil
+}
+
+// isCSAFRemediationCategory is the closed CSAF remediation enum of §3.2.3.12.
+func isCSAFRemediationCategory(value string) bool {
+	switch value {
+	case "mitigation", "no_fix_planned", "none_available", "vendor_fix", "workaround":
+		return true
+	default:
+		return false
+	}
+}
+
+// isCVE is the adapter's own check of the CVE grammar: it does not trust that
+// the evaluator validated the identifier. "CVE-", at least four digits, a
+// hyphen, and at least four digits. A non-CVE advisory identifier is never
+// presented as a CVE.
+func isCVE(value string) bool {
+	const prefix = "CVE-"
+	if !strings.HasPrefix(value, prefix) {
+		return false
+	}
+	rest := value[len(prefix):]
+	if len(rest) < 9 || rest[4] != '-' {
+		return false
+	}
+	for index := 0; index < len(rest); index++ {
+		if index == 4 {
+			continue
+		}
+		if rest[index] < '0' || rest[index] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // isIRI accepts an IRI for the document identifier: a scheme (letter followed by
 // letters, digits, '+', '-' or '.') with a non-empty remainder, and no space or
 // control character anywhere.
