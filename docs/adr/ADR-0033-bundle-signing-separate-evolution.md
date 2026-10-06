@@ -1,6 +1,6 @@
 # ADR-0033: Bundle signing as a separate evolution
 
-**Status: Proposed (2026-10-05).** Independently reviewed (`apto`, 0 P0/0 P1) and published the same day; owner ratification pending. Task A3-05. **No implementation is part of this decision**: it adds no wire fields, states, CLI commands or dependencies; any future implementation requires a new ADR with its own authorization.
+**Status: Ratified on 2026-10-06 by the owner** (proposed 2026-10-05). Independently reviewed (`apto`, 0 P0/0 P1) and published on 2026-10-05; owner ratification granted on 2026-10-06 and recorded locally (no further commit/push). Task A3-05. **No implementation is part of this decision**: it adds no wire fields, states, CLI commands or dependencies; any future implementation requires a new ADR with its own authorization.
 
 ## Proposed decision
 
@@ -65,4 +65,4 @@ The implementation ADR must define, at minimum: key and trust-anchor model; sign
 - **Completes** the evaluation opened by threat T10 and ADR-0017.
 - **Respects**: ADR-0024, ADR-0022 and ADR-0019 Q-07 (distribution not authorized); ADR-0010 (signing covers projection bytes and does not change content digest-class semantics).
 - **Supersedes**: nothing. **Superseded by**: nothing.
-- **Acceptance**: pending owner ratification after independent review.
+- **Acceptance**: ratified by the owner on 2026-10-06 after independent review.
