@@ -1,16 +1,21 @@
 package main
 
 import (
+	"strconv"
 	"strings"
+
+	"github.com/d4rpell/Ariadne/internal/casefile"
 )
 
-// Command names of the ratified surface (ADR-0023 §4.1). The deferred ones are
-// known and rejected with their own code: they are not aliases and they must not
-// appear to work.
+// Command names of the ratified surface (ADR-0023 §4.1) plus the read-only
+// platform server (ADR-0034, task A3-06). The deferred ones are known and
+// rejected with their own code: they are not aliases and they must not appear to
+// work.
 const (
 	commandEvaluate = "evaluate"
 	commandReport   = "report"
 	commandVerify   = "verify"
+	commandServe    = "serve"
 )
 
 var deferredCommands = []string{"import", "normalize", "diff"}
@@ -18,7 +23,7 @@ var deferredCommands = []string{"import", "normalize", "diff"}
 // helpLines are the exact ratified texts of ADR-0023 §4.1. They are constants of
 // this package, not data from any file, and the tests freeze them byte a byte.
 const (
-	helpRoot = "Usage: ariadne <evaluate|report|verify> [flags]\n" +
+	helpRoot = "Usage: ariadne <evaluate|report|verify|serve> [flags]\n" +
 		"Use ariadne <command> --help for required flags.\n" +
 		"Pre-alpha. Offline. Report distribution is not authorized.\n"
 	helpLastLine = "Pre-alpha. Offline. Report distribution is not authorized.\n"
@@ -33,6 +38,7 @@ var (
 	flagsEvaluate = flagSet{"bundle", "bundle-hash", "pack", "context"}
 	flagsReport   = flagSet{"bundle", "bundle-hash", "pack", "context", "format", "out"}
 	flagsVerify   = flagSet{"bundle", "bundle-hash", "pack", "context", "result-fingerprint"}
+	flagsServe    = flagSet{"casebook", "as-of", "port"}
 )
 
 // invocation is one parsed command with its flags resolved. Values are literals
@@ -67,6 +73,8 @@ func parseArguments(argv []string) (invocation, *cliError) {
 		return parseCommand(commandReport, flagsReport, argv[1:])
 	case commandVerify:
 		return parseCommand(commandVerify, flagsVerify, argv[1:])
+	case commandServe:
+		return parseCommand(commandServe, flagsServe, argv[1:])
 	}
 	for _, deferred := range deferredCommands {
 		if name == deferred {
@@ -123,20 +131,52 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 	// The closed vocabularies of the interface are argument grammar: a hash that
 	// is not `sha256:` plus 64 lowercase hex and a format outside json|html are
 	// the same rejection as an unknown flag, decided before any file is read.
-	if !isSha256Text(values["bundle-hash"]) {
-		return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+	if command != commandServe {
+		if !isSha256Text(values["bundle-hash"]) {
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+		if command == commandVerify && !isSha256Text(values["result-fingerprint"]) {
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+		if command == commandReport {
+			switch values["format"] {
+			case "json", "html":
+			default:
+				return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+			}
+		}
 	}
-	if command == commandVerify && !isSha256Text(values["result-fingerprint"]) {
-		return invocation{}, newFailure(stageArguments, codeInvalidArguments)
-	}
-	if command == commandReport {
-		switch values["format"] {
-		case "json", "html":
-		default:
+	if command == commandServe {
+		// The port and the as-of instant are argument grammar: a port outside
+		// 1..65535 and an instant the canonical timestamp profile rejects are the
+		// same rejection as an unknown flag, decided before any file is read. The
+		// instant is validated by the very function that consumes it.
+		if !validPortText(values["port"]) {
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+		if _, err := casefile.Assess(casefile.NewBook(), values["as-of"]); err != nil {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
 	}
 	return invocation{command: command, values: values}, nil
+}
+
+// validPortText admits the decimal spelling of an integer in 1..65535: digits
+// only, no sign and no whitespace.
+func validPortText(value string) bool {
+	if value == "" {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		if value[index] < '0' || value[index] > '9' {
+			return false
+		}
+	}
+	port, err := strconv.Atoi(value)
+	if err != nil {
+		return false
+	}
+	return port >= 1 && port <= 65535
 }
 
 func (set flagSet) has(name string) bool {
@@ -160,6 +200,8 @@ func (call invocation) helpText() string {
 		return "Usage: ariadne report --bundle PATH --bundle-hash H --pack PATH --context PATH --format json|html --out PATH\n" + helpLastLine
 	case call.command == commandVerify:
 		return "Usage: ariadne verify --bundle PATH --bundle-hash H --pack PATH --context PATH --result-fingerprint H\n" + helpLastLine
+	case call.command == commandServe:
+		return "Usage: ariadne serve --casebook PATH --as-of TIMESTAMP --port N\n" + helpLastLine
 	}
 	return ""
 }

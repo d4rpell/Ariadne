@@ -45,6 +45,12 @@ func run(argv []string, stdout, stderr io.Writer) int {
 }
 
 func execute(call invocation, stdout io.Writer, cwd string) *cliError {
+	// The read-only platform server is its own surface (ADR-0034, task A3-06):
+	// it reads one casefile book instead of a bundle, context and pack, so it
+	// branches before the evaluation order.
+	if call.command == commandServe {
+		return runServe(call, stdout, cwd)
+	}
 	// Phase 1-2: every read precedes every decode, in the ratified order.
 	bundleBytes, failure := readInput(call.value("bundle"), stageBundleRead, maxBundleInputBytes, true, cwd)
 	if failure != nil {
