@@ -40,8 +40,8 @@ func TestA201ImportBoundaryRoots(t *testing.T) {
 			t.Fatalf("pre-existing root %q disappeared", name)
 		}
 	}
-	if len(importBoundaries) != 12 {
-		t.Fatalf("importBoundaries has %d entries, want twelve", len(importBoundaries))
+	if len(importBoundaries) != 13 {
+		t.Fatalf("importBoundaries has %d entries, want thirteen", len(importBoundaries))
 	}
 }
 

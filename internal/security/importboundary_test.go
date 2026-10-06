@@ -61,6 +61,10 @@ type boundaryDeclaration struct {
 	// networkDirs lists the module-relative directories whose own sources may
 	// use the network additions of the collector profile.
 	networkDirs []string
+	// networkAdditions, when non-nil, replaces the collector network additions
+	// for the directories granted in networkDirs, letting a root grant a
+	// narrower addition (the read-only platform grants only net and net/http).
+	networkAdditions []string
 	// bannedLocal lists package paths forbidden in the sources of the closure.
 	bannedLocal []string
 }
@@ -119,9 +123,21 @@ var importBoundaries = []boundaryDeclaration{
 		// inside the standard library: the graph pass bans only what must never
 		// appear even transitively, while `unsafe`, `syscall` and `plugin` remain
 		// forbidden in the adapter's own sources and in the local closure.
-		graphExact:  []string{"net", "os/exec", "plugin"},
-		graphTrees:  []string{"net/http", "k8s.io/client-go"},
-		bannedLocal: offlineRootBannedLocal,
+		//
+		// Since the CLI reaches the read-only platform server (ADR-0034), its
+		// graph now contains net and net/http transitively; the transitive graph
+		// pass can no longer ban them, but the direct scan still forbids net and
+		// the net/http tree in the CLI's own sources (exact/trees), and the
+		// closure checks every local package against cliStdlibAllowlist.
+		graphExact: []string{"os/exec", "plugin"},
+		graphTrees: []string{"k8s.io/client-go"},
+		allowlist:  cliStdlibAllowlist,
+		// net and net/http are granted per package to internal/platform alone,
+		// with the narrower readOnlyPlatformNetworkAdditions; every other package
+		// of the CLI closure keeps the base list, which excludes them.
+		networkDirs:      []string{"internal/platform"},
+		networkAdditions: readOnlyPlatformNetworkAdditions,
+		bannedLocal:      offlineRootBannedLocal,
 	},
 	// Sanitized PodList adapter roots (ADR-0025 A.11.3). The profile must not
 	// reach network, shell, filesystem, process execution or cluster clients,
@@ -230,6 +246,29 @@ var importBoundaries = []boundaryDeclaration{
 		allowlist:   casefileStdlibAllowlist,
 		bannedLocal: offlineRootBannedLocal,
 	},
+	// Read-only governance platform (ADR-0034, task A3-06). This is the
+	// thirteenth root and the only one that listens on the network: the loopback
+	// dashboard server binds 127.0.0.1 and serves net/http. net and net/http are
+	// therefore permitted in its own sources and in the closure, but only through
+	// the root's own allowlist (platformStdlibAllowlist), which also covers the
+	// direct imports of internal/casefile reached from it: the permission is a
+	// closed list, never the collector's network addition. The server listens
+	// (net.Listen) and never dials. `os`, the process and the native surfaces stay
+	// forbidden in the sources and in the closure; the graph pass cannot ban `os`
+	// because the standard library's own net/http reaches it. The root must never
+	// reach the live collector or the Prisma API connector.
+	{
+		name:        "platform",
+		target:      "../platform",
+		dir:         "internal/platform",
+		strict:      true,
+		exact:       []string{"os", "os/exec", "plugin", "unsafe", "syscall"},
+		trees:       []string{"k8s.io/client-go"},
+		graphExact:  []string{"os/exec", "plugin"},
+		graphTrees:  []string{"k8s.io/client-go"},
+		allowlist:   platformStdlibAllowlist,
+		bannedLocal: offlineRootBannedLocal,
+	},
 }
 
 // adapterRoots are the boundary names whose closure uses the independent
@@ -288,7 +327,7 @@ func TestImportBoundary(t *testing.T) {
 				// addition outside the declared list is refused without waiting
 				// for the closure pass.
 				if boundary.allowlist != nil && stdlibPath(found.path) {
-					packageAllowlist := stdlibAllowlistFor(closurePolicy{allowlist: boundary.allowlist, networkPackages: boundary.networkDirs}, boundary.dir)
+					packageAllowlist := stdlibAllowlistFor(closurePolicy{allowlist: boundary.allowlist, networkPackages: boundary.networkDirs, networkAdditions: boundary.networkAdditions}, boundary.dir)
 					if !slices.Contains(packageAllowlist, found.path) {
 						t.Errorf("%s: %s imports %s, outside the declared allowlist", importPath, found.file, found.path)
 					}
@@ -299,21 +338,52 @@ func TestImportBoundary(t *testing.T) {
 			// Makefile names selects this function, so a closure failure must
 			// fail here and not only in the analyzer's own cases.
 			closure := analyzeClosure(t, moduleRoot(t), closurePolicy{
-				name:            boundary.name,
-				dir:             boundary.dir,
-				core:            boundary.core,
-				strict:          boundary.strict,
-				stdlibOnly:      boundary.stdlibOnly,
-				exact:           boundary.exact,
-				trees:           boundary.trees,
-				allowlist:       allowlistFor(boundary),
-				networkPackages: boundary.networkDirs,
-				bannedLocal:     boundary.bannedLocal,
+				name:             boundary.name,
+				dir:              boundary.dir,
+				core:             boundary.core,
+				strict:           boundary.strict,
+				stdlibOnly:       boundary.stdlibOnly,
+				exact:            boundary.exact,
+				trees:            boundary.trees,
+				allowlist:        allowlistFor(boundary),
+				networkPackages:  boundary.networkDirs,
+				networkAdditions: boundary.networkAdditions,
+				bannedLocal:      boundary.bannedLocal,
 			})
 			for _, finding := range closure {
 				t.Errorf("import closure: %s", finding)
 			}
 		})
+	}
+}
+
+// TestCLINetworkGrantIsScoped pins the invariant of the ADR-0034 CLI boundary:
+// net and net/http are granted inside the CLI closure to internal/platform
+// alone, never to another local package. It would have caught the original
+// over-broad grant, where the base allowlist let any helper reach the socket.
+func TestCLINetworkGrantIsScoped(t *testing.T) {
+	for _, pkg := range []string{"net", "net/http"} {
+		if slices.Contains(cliStdlibAllowlist, pkg) {
+			t.Errorf("cliStdlibAllowlist must not contain %q in its base list", pkg)
+		}
+	}
+	policy := closurePolicy{
+		allowlist:        cliStdlibAllowlist,
+		networkPackages:  []string{"internal/platform"},
+		networkAdditions: readOnlyPlatformNetworkAdditions,
+	}
+	granted := stdlibAllowlistFor(policy, "internal/platform")
+	if !slices.Contains(granted, "net") || !slices.Contains(granted, "net/http") {
+		t.Errorf("internal/platform must be granted net and net/http inside the CLI closure, got %v", granted)
+	}
+	if slices.Contains(granted, "crypto/tls") || slices.Contains(granted, "net/url") || slices.Contains(granted, "context") {
+		t.Errorf("the platform grant must stay narrower than the collector addition, got %v", granted)
+	}
+	for _, other := range []string{"internal/report", "internal/casefile", "internal/bundle"} {
+		got := stdlibAllowlistFor(policy, other)
+		if slices.Contains(got, "net") || slices.Contains(got, "net/http") {
+			t.Errorf("%s must not be granted net or net/http, got %v", other, got)
+		}
 	}
 }
 

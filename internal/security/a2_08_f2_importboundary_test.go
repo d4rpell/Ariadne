@@ -24,8 +24,8 @@ func TestA208F2ImportBoundaryRoots(t *testing.T) {
 			}
 			declared[boundary.name] = boundary
 		}
-		if len(importBoundaries) != 12 {
-			t.Fatalf("importBoundaries has %d entries, want twelve", len(importBoundaries))
+		if len(importBoundaries) != 13 {
+			t.Fatalf("importBoundaries has %d entries, want thirteen", len(importBoundaries))
 		}
 		connector, present := declared["prismaacquire"]
 		if !present {

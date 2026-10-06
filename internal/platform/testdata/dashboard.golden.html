@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ariadne governance dashboard</title>
+<style>
+body{font-family:system-ui,sans-serif;line-height:1.45;margin:2rem;max-width:90rem}
+h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.8rem}
+table{border-collapse:collapse;margin:0.6rem 0}th,td{border:1px solid #999;padding:0.25rem 0.5rem;text-align:left;vertical-align:top}
+code{font-family:ui-monospace,monospace}
+.pre-alpha{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
+.limits{color:#333}
+</style>
+</head>
+<body>
+<h1>Ariadne governance dashboard</h1>
+<p class="pre-alpha">read-only projection of one human decision record; not a risk acceptance, not an approval, not a security statement; not a source of truth</p>
+<table>
+<tr><th>Records</th><td>6</td></tr>
+<tr><th>As of</th><td><code>2026-03-01T00:00:00Z</code></td></tr>
+<tr><th>Book head hash</th><td><code>sha256:425a4e43567d8f0147ad4904215b9044331354d7c0ba41cc23964c6a3bb3fe7e</code></td></tr>
+</table>
+<h2>Decision records</h2>
+<p>One row per declared human risk decision, in append order. The standing column is the derived validity view of the record at the as-of instant; it is not a product status and not an approval.</p>
+<table>
+<tr><th>sequence</th><th>subject_uid</th><th>container_class</th><th>container_name</th><th>vulnerability_id</th><th>risk_decision</th><th>decided_at</th><th>expires_at</th><th>standing</th><th>superseded_by</th><th>anomalies</th><th>detail</th></tr>
+<tr><td><a href="/decision/1">1</a></td><td><code>uid-a</code></td><td><code>regular</code></td><td><code>payments-api</code></td><td><code>CVE-A</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>2026-06-01T00:00:00Z</code></td><td><code>effective</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/1">detail</a></td></tr>
+<tr><td><a href="/decision/2">2</a></td><td><code>uid-b</code></td><td><code>regular</code></td><td><code>orders-api</code></td><td><code>CVE-B</code></td><td><code>deferred</code></td><td><code>2026-12-01T00:00:00Z</code></td><td><code>null</code></td><td><code>pending</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/2">detail</a></td></tr>
+<tr><td><a href="/decision/3">3</a></td><td><code>uid-c</code></td><td><code>init</code></td><td><code>legacy-job</code></td><td><code>CVE-C</code></td><td><code>rejected</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>2026-02-01T00:00:00Z</code></td><td><code>expired</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/3">detail</a></td></tr>
+<tr><td><a href="/decision/4">4</a></td><td><code>uid-d</code></td><td><code>regular</code></td><td><code>reports-api</code></td><td><code>CVE-D</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>null</code></td><td><code>superseded</code></td><td><code>sha256:2a2f764dc42f2e0b85577e567c7eb2ed9c0b3266d98d793414dadb73fc2f0f4c</code></td><td>none</td><td><a href="/decision/4">detail</a></td></tr>
+<tr><td><a href="/decision/5">5</a></td><td><code>uid-d</code></td><td><code>regular</code></td><td><code>reports-api</code></td><td><code>CVE-D</code></td><td><code>deferred</code></td><td><code>2026-02-01T00:00:00Z</code></td><td><code>null</code></td><td><code>effective</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/5">detail</a></td></tr>
+<tr><td><a href="/decision/6">6</a></td><td><code>uid-e</code></td><td><code>ephemeral</code></td><td><code>search-api</code></td><td><code>CVE-E</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>null</code></td><td><code>effective</code></td><td><code>null</code></td><td><code>supersedes_subject_mismatch</code> </td><td><a href="/decision/6">detail</a></td></tr>
+</table>
+<p class="limits">Absence is shown as an explicit <code>null</code> or <code>none</code>. Only the human risk decision layer is shown; no product status and no exploitability value exists in this record and none is invented.</p>
+</body>
+</html>

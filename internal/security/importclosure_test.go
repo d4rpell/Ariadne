@@ -53,6 +53,11 @@ type closurePolicy struct {
 	// collector profile. A helper reached from them keeps the adapter allowlist:
 	// the network permission never propagates to another local package.
 	networkPackages []string
+	// networkAdditions, when non-nil, replaces collectorNetworkAdditions for the
+	// packages granted in networkPackages. It lets a root grant a narrower
+	// addition than the collector profile: the read-only platform (ADR-0034)
+	// grants only net and net/http.
+	networkAdditions []string
 	// bannedLocal are the package paths forbidden in the sources of every local
 	// package of this closure, the root included. They are checked before any
 	// allowlist branch, so a variant file or a local helper cannot smuggle them.
@@ -104,6 +109,75 @@ var casefileStdlibAllowlist = []string{
 	"reflect",
 	"strconv",
 	"strings",
+	"unicode",
+	"unicode/utf8",
+}
+
+// platformStdlibAllowlist is the independent policy of internal/platform
+// (ADR-0034, task A3-06): the read-only loopback server may reach the network
+// stack only to listen (net/http), and it reaches internal/casefile for the
+// admitted book, so the list unions the direct standard-library imports of both
+// packages. There is no dial, no os, no exec, no native code and no cluster
+// client. It shares nothing mutable with any other list.
+var platformStdlibAllowlist = []string{
+	"bytes",
+	"crypto/sha256",
+	"encoding/hex",
+	"errors",
+	"fmt",
+	"html/template",
+	"io",
+	"net",
+	"net/http",
+	"reflect",
+	"strconv",
+	"strings",
+	"unicode",
+	"unicode/utf8",
+}
+
+// readOnlyPlatformNetworkAdditions is the network addition granted inside the
+// CLI closure (ADR-0034, task A3-06): the read-only loopback server may reach
+// exactly net (to listen) and net/http (to serve). It is narrower than the
+// collector addition — no context, tls, x509 or net/url — and is granted only
+// to internal/platform, never to a helper.
+var readOnlyPlatformNetworkAdditions = []string{"net", "net/http"}
+
+// cliStdlibAllowlist is the base closure policy of the cmd/ariadne root once it
+// reaches the read-only platform server (ADR-0034, task A3-06). The CLI's own
+// sources keep their declarative prohibitions (net, os/exec, plugin, unsafe,
+// syscall, the net/http tree and the cluster client tree) in exact/trees, which
+// the direct scan applies; the closure, however, traverses the whole offline
+// pipeline and the platform server, so it must admit the union of the direct
+// standard-library imports of every local package it reaches. The list is a
+// closed set: a new standard-library import in any package of the CLI closure
+// fails closed until it is added deliberately.
+//
+// net and net/http are deliberately NOT in this base list: they are granted per
+// package to internal/platform alone (networkDirs plus the narrower
+// readOnlyPlatformNetworkAdditions), so no other package of the CLI closure can
+// reach the socket or the HTTP client through the gate.
+var cliStdlibAllowlist = []string{
+	"bytes",
+	"crypto/sha256",
+	"encoding/hex",
+	"encoding/json",
+	"errors",
+	"fmt",
+	"html/template",
+	"io",
+	"io/fs",
+	"math",
+	"net/netip",
+	"os",
+	"path/filepath",
+	"reflect",
+	"regexp",
+	"runtime",
+	"sort",
+	"strconv",
+	"strings",
+	"time",
 	"unicode",
 	"unicode/utf8",
 }
@@ -160,7 +234,11 @@ func stdlibAllowlistFor(policy closurePolicy, localPackage string) []string {
 	}
 	for _, granted := range policy.networkPackages {
 		if localPackage == granted {
-			return append(append([]string{}, policy.allowlist...), collectorNetworkAdditions...)
+			additions := policy.networkAdditions
+			if additions == nil {
+				additions = collectorNetworkAdditions
+			}
+			return append(append([]string{}, policy.allowlist...), additions...)
 		}
 	}
 	return policy.allowlist
