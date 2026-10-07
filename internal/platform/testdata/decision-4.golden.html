@@ -5,46 +5,178 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ariadne decision record</title>
 <style>
-body{font-family:system-ui,sans-serif;line-height:1.45;margin:2rem;max-width:90rem}
-h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.8rem}
-table{border-collapse:collapse;margin:0.6rem 0}th,td{border:1px solid #999;padding:0.25rem 0.5rem;text-align:left;vertical-align:top}
-code{font-family:ui-monospace,monospace}
-.pre-alpha{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
+:root {
+	color: #18212b;
+	background: #f5f7f9;
+	font-family: system-ui, sans-serif;
+	line-height: 1.5;
+	--standing-effective-text: #185b35;
+	--standing-effective-background: #eaf4ee;
+	--standing-pending-text: #715007;
+	--standing-pending-background: #fff4d8;
+	--standing-expired-text: #912b2b;
+	--standing-expired-background: #faeded;
+	--standing-superseded-text: #4b5563;
+	--standing-superseded-background: #edf0f3;
+	--risk-accepted-text: #185b35;
+	--risk-accepted-background: #eaf4ee;
+	--risk-deferred-text: #715007;
+	--risk-deferred-background: #fff4d8;
+	--risk-rejected-text: #912b2b;
+	--risk-rejected-background: #faeded;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1480px; margin: 0 auto; padding: 24px; }
+h1 { margin: 0 0 16px; font-size: 1.75rem; }
+h2 { margin: 0 0 12px; font-size: 1.125rem; }
+p { margin: 0 0 16px; }
+section { margin-top: 28px; }
+.pre-alpha {
+	padding: 12px 16px;
+	border-left: 4px solid #4b5563;
+	background: #edf0f3;
+	font-size: 0.875rem;
+}
+.breadcrumb { color: #4b5563; font-size: 0.875rem; }
+.summary-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+table { width: 100%; border-collapse: collapse; background: #ffffff; }
+caption { padding: 0 0 8px; text-align: left; font-weight: 600; }
+th, td {
+	padding: 8px;
+	border: 1px solid #cad0d7;
+	text-align: left;
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+th { font-weight: 600; background: #f0f2f4; white-space: nowrap; }
+tbody tr { transition: background-color 160ms ease; }
+tbody tr:hover { background-color: #f5f7f9; }
+.table-scroll { overflow-x: auto; }
+.records { min-width: 1200px; font-size: 0.8125rem; }
+.fields th { width: 25%; }
+.rationale { white-space: pre-wrap; }
+.stamp { white-space: nowrap; }
+.summary-grid td { font-variant-numeric: tabular-nums; }
+ul { margin: 0; padding-left: 20px; }
+a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
+	padding: 4px 8px;
+	color: #174ea6;
+	text-decoration: underline;
+	white-space: nowrap;
+	transition: color 180ms ease, background-color 180ms ease;
+}
+a:hover, a:focus-visible { background-color: #e8edf3; }
+:focus-visible { outline: 3px solid #174ea6; outline-offset: 3px; }
+.badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #18212b;
+	background-color: #edf0f3;
+	font-size: 0.875rem;
+	white-space: nowrap;
+	transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.badge:hover { border-color: currentColor; }
+.standing-effective {
+	color: var(--standing-effective-text);
+	background-color: var(--standing-effective-background);
+}
+.standing-pending {
+	color: var(--standing-pending-text);
+	background-color: var(--standing-pending-background);
+}
+.standing-expired {
+	color: var(--standing-expired-text);
+	background-color: var(--standing-expired-background);
+}
+.standing-superseded {
+	color: var(--standing-superseded-text);
+	background-color: var(--standing-superseded-background);
+}
+.risk-accepted {
+	color: var(--risk-accepted-text);
+	background-color: var(--risk-accepted-background);
+}
+.risk-deferred {
+	color: var(--risk-deferred-text);
+	background-color: var(--risk-deferred-background);
+}
+.risk-rejected {
+	color: var(--risk-rejected-text);
+	background-color: var(--risk-rejected-background);
+}
+@media (max-width: 600px) {
+	main { padding: 16px; }
+	.summary-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+	a, .badge, tbody tr { transition-duration: 1ms; }
+}
 </style>
 </head>
 <body>
-<h1>Decision record</h1>
+<main>
+<header>
+<nav aria-label="Breadcrumb"><p class="breadcrumb"><a href="/">Dashboard</a> / Decision #4</p></nav>
+<h1>Decision record #4</h1>
 <p class="pre-alpha">read-only projection of one human decision record; not a risk acceptance, not an approval, not a security statement; not a source of truth</p>
-<p><a href="/">Back to the dashboard</a></p>
-<h2>Declaration</h2>
-<table>
-<tr><th>sequence</th><td>4</td></tr>
-<tr><th>hash</th><td><code>sha256:bfff007d4189a5f298488577859ecdf6256f2af08717908b9a2e60fc4bd394cc</code></td></tr>
-<tr><th>previous_hash</th><td><code>sha256:54cd85fa530b543f48ec558b47b868631b45ec3161aeb8955fb5e315d582b11a</code></td></tr>
-<tr><th>risk_decision</th><td><code>accepted</code></td></tr>
-<tr><th>owner</th><td><code>platform owner</code></td></tr>
-<tr><th>approver</th><td><code>security approver</code></td></tr>
-<tr><th>rationale</th><td><code>first declaration of subject d</code></td></tr>
-<tr><th>decided_at</th><td><code>2026-01-01T00:00:00Z</code></td></tr>
-<tr><th>expires_at</th><td><code>null</code></td></tr>
+</header>
+<section aria-labelledby="declaration-heading">
+<h2 id="declaration-heading">Declaration</h2>
+<table class="fields">
+<tbody>
+<tr><th scope="row">sequence</th><td>4</td></tr>
+<tr><th scope="row">hash</th><td>sha256:bfff007d4189a5f298488577859ecdf6256f2af08717908b9a2e60fc4bd394cc</td></tr>
+<tr><th scope="row">previous_hash</th><td>sha256:54cd85fa530b543f48ec558b47b868631b45ec3161aeb8955fb5e315d582b11a</td></tr>
+<tr><th scope="row">risk_decision</th><td><span class="badge risk-accepted">accepted</span></td></tr>
+<tr><th scope="row">owner</th><td>platform owner</td></tr>
+<tr><th scope="row">approver</th><td>security approver</td></tr>
+<tr><th scope="row">rationale</th><td class="rationale">first declaration of subject d</td></tr>
+<tr><th scope="row">decided_at</th><td>2026-01-01T00:00:00Z</td></tr>
+<tr><th scope="row">expires_at</th><td>null</td></tr>
+</tbody>
 </table>
-<h2>Scope</h2>
-<table>
-<tr><th>bundle_hash</th><td><code>sha256:1111111111111111111111111111111111111111111111111111111111111111</code></td></tr>
-<tr><th>subject_uid</th><td><code>uid-d</code></td></tr>
-<tr><th>container_name</th><td><code>reports-api</code></td></tr>
-<tr><th>container_class</th><td><code>regular</code></td></tr>
-<tr><th>vulnerability_id</th><td><code>CVE-D</code></td></tr>
-<tr><th>result_fingerprint</th><td><code>null</code></td></tr>
+</section>
+<section aria-labelledby="scope-heading">
+<h2 id="scope-heading">Scope</h2>
+<table class="fields">
+<tbody>
+<tr><th scope="row">bundle_hash</th><td>sha256:1111111111111111111111111111111111111111111111111111111111111111</td></tr>
+<tr><th scope="row">subject_uid</th><td>uid-d</td></tr>
+<tr><th scope="row">container_name</th><td>reports-api</td></tr>
+<tr><th scope="row">container_class</th><td>regular</td></tr>
+<tr><th scope="row">vulnerability_id</th><td>CVE-D</td></tr>
+<tr><th scope="row">result_fingerprint</th><td>null</td></tr>
+</tbody>
 </table>
-<h2>Controls</h2>
-<ul><li><code>network policy</code></li></ul>
-<h2>Derived validity view</h2>
-<p>Derived at the as-of instant of the dashboard. It is a governance view, never a product status, an exploitability value or an approval.</p>
-<table>
-<tr><th>standing</th><td><code>superseded</code></td></tr>
-<tr><th>superseded_by</th><td><code>sha256:2a2f764dc42f2e0b85577e567c7eb2ed9c0b3266d98d793414dadb73fc2f0f4c</code></td></tr>
-<tr><th>anomalies</th><td>none</td></tr>
+</section>
+<section aria-labelledby="controls-heading">
+<h2 id="controls-heading">Controls</h2>
+<ul><li>network policy</li></ul>
+</section>
+<section aria-labelledby="validity-heading">
+<h2 id="validity-heading">Derived validity view</h2>
+<p>Standing is derived from declared validity and supersession. It does not change or approve the underlying declaration.</p>
+<table class="fields">
+<tbody>
+<tr><th scope="row">standing</th><td><span class="badge standing-superseded">superseded</span></td></tr>
+<tr><th scope="row">superseded_by</th><td>sha256:2a2f764dc42f2e0b85577e567c7eb2ed9c0b3266d98d793414dadb73fc2f0f4c</td></tr>
+<tr><th scope="row">anomalies</th><td>none</td></tr>
+</tbody>
 </table>
+</section>
+</main>
 </body>
 </html>

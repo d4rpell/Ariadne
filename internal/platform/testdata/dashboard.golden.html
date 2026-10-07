@@ -5,33 +5,281 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ariadne governance dashboard</title>
 <style>
-body{font-family:system-ui,sans-serif;line-height:1.45;margin:2rem;max-width:90rem}
-h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.8rem}
-table{border-collapse:collapse;margin:0.6rem 0}th,td{border:1px solid #999;padding:0.25rem 0.5rem;text-align:left;vertical-align:top}
-code{font-family:ui-monospace,monospace}
-.pre-alpha{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
-.limits{color:#333}
+:root {
+	color: #18212b;
+	background: #f5f7f9;
+	font-family: system-ui, sans-serif;
+	line-height: 1.5;
+	--standing-effective-text: #185b35;
+	--standing-effective-background: #eaf4ee;
+	--standing-pending-text: #715007;
+	--standing-pending-background: #fff4d8;
+	--standing-expired-text: #912b2b;
+	--standing-expired-background: #faeded;
+	--standing-superseded-text: #4b5563;
+	--standing-superseded-background: #edf0f3;
+	--risk-accepted-text: #185b35;
+	--risk-accepted-background: #eaf4ee;
+	--risk-deferred-text: #715007;
+	--risk-deferred-background: #fff4d8;
+	--risk-rejected-text: #912b2b;
+	--risk-rejected-background: #faeded;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1480px; margin: 0 auto; padding: 24px; }
+h1 { margin: 0 0 16px; font-size: 1.75rem; }
+h2 { margin: 0 0 12px; font-size: 1.125rem; }
+p { margin: 0 0 16px; }
+section { margin-top: 28px; }
+.pre-alpha {
+	padding: 12px 16px;
+	border-left: 4px solid #4b5563;
+	background: #edf0f3;
+	font-size: 0.875rem;
+}
+.breadcrumb { color: #4b5563; font-size: 0.875rem; }
+.summary-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+table { width: 100%; border-collapse: collapse; background: #ffffff; }
+caption { padding: 0 0 8px; text-align: left; font-weight: 600; }
+th, td {
+	padding: 8px;
+	border: 1px solid #cad0d7;
+	text-align: left;
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+th { font-weight: 600; background: #f0f2f4; white-space: nowrap; }
+tbody tr { transition: background-color 160ms ease; }
+tbody tr:hover { background-color: #f5f7f9; }
+.table-scroll { overflow-x: auto; }
+.records { min-width: 1200px; font-size: 0.8125rem; }
+.fields th { width: 25%; }
+.rationale { white-space: pre-wrap; }
+.stamp { white-space: nowrap; }
+.summary-grid td { font-variant-numeric: tabular-nums; }
+ul { margin: 0; padding-left: 20px; }
+a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
+	padding: 4px 8px;
+	color: #174ea6;
+	text-decoration: underline;
+	white-space: nowrap;
+	transition: color 180ms ease, background-color 180ms ease;
+}
+a:hover, a:focus-visible { background-color: #e8edf3; }
+:focus-visible { outline: 3px solid #174ea6; outline-offset: 3px; }
+.badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #18212b;
+	background-color: #edf0f3;
+	font-size: 0.875rem;
+	white-space: nowrap;
+	transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.badge:hover { border-color: currentColor; }
+.standing-effective {
+	color: var(--standing-effective-text);
+	background-color: var(--standing-effective-background);
+}
+.standing-pending {
+	color: var(--standing-pending-text);
+	background-color: var(--standing-pending-background);
+}
+.standing-expired {
+	color: var(--standing-expired-text);
+	background-color: var(--standing-expired-background);
+}
+.standing-superseded {
+	color: var(--standing-superseded-text);
+	background-color: var(--standing-superseded-background);
+}
+.risk-accepted {
+	color: var(--risk-accepted-text);
+	background-color: var(--risk-accepted-background);
+}
+.risk-deferred {
+	color: var(--risk-deferred-text);
+	background-color: var(--risk-deferred-background);
+}
+.risk-rejected {
+	color: var(--risk-rejected-text);
+	background-color: var(--risk-rejected-background);
+}
+@media (max-width: 600px) {
+	main { padding: 16px; }
+	.summary-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+	a, .badge, tbody tr { transition-duration: 1ms; }
+}
 </style>
 </head>
 <body>
+<main>
+<header>
 <h1>Ariadne governance dashboard</h1>
 <p class="pre-alpha">read-only projection of one human decision record; not a risk acceptance, not an approval, not a security statement; not a source of truth</p>
-<table>
-<tr><th>Records</th><td>6</td></tr>
-<tr><th>As of</th><td><code>2026-03-01T00:00:00Z</code></td></tr>
-<tr><th>Book head hash</th><td><code>sha256:425a4e43567d8f0147ad4904215b9044331354d7c0ba41cc23964c6a3bb3fe7e</code></td></tr>
+</header>
+<section aria-labelledby="book-heading">
+<h2 id="book-heading">Book observation</h2>
+<table class="fields">
+<tbody>
+<tr><th scope="row">Records</th><td>6</td></tr>
+<tr><th scope="row">As of</th><td>2026-03-01T00:00:00Z</td></tr>
+<tr><th scope="row">Book head hash</th><td>sha256:425a4e43567d8f0147ad4904215b9044331354d7c0ba41cc23964c6a3bb3fe7e</td></tr>
+</tbody>
 </table>
-<h2>Decision records</h2>
-<p>One row per declared human risk decision, in append order. The standing column is the derived validity view of the record at the as-of instant; it is not a product status and not an approval.</p>
+</section>
+<section aria-labelledby="summary-heading">
+<h2 id="summary-heading">Derived summary</h2>
+<p>Counts are derived from the entries below, including expired and superseded declarations.</p>
+<div class="summary-grid">
 <table>
-<tr><th>sequence</th><th>subject_uid</th><th>container_class</th><th>container_name</th><th>vulnerability_id</th><th>risk_decision</th><th>decided_at</th><th>expires_at</th><th>standing</th><th>superseded_by</th><th>anomalies</th><th>detail</th></tr>
-<tr><td><a href="/decision/1">1</a></td><td><code>uid-a</code></td><td><code>regular</code></td><td><code>payments-api</code></td><td><code>CVE-A</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>2026-06-01T00:00:00Z</code></td><td><code>effective</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/1">detail</a></td></tr>
-<tr><td><a href="/decision/2">2</a></td><td><code>uid-b</code></td><td><code>regular</code></td><td><code>orders-api</code></td><td><code>CVE-B</code></td><td><code>deferred</code></td><td><code>2026-12-01T00:00:00Z</code></td><td><code>null</code></td><td><code>pending</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/2">detail</a></td></tr>
-<tr><td><a href="/decision/3">3</a></td><td><code>uid-c</code></td><td><code>init</code></td><td><code>legacy-job</code></td><td><code>CVE-C</code></td><td><code>rejected</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>2026-02-01T00:00:00Z</code></td><td><code>expired</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/3">detail</a></td></tr>
-<tr><td><a href="/decision/4">4</a></td><td><code>uid-d</code></td><td><code>regular</code></td><td><code>reports-api</code></td><td><code>CVE-D</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>null</code></td><td><code>superseded</code></td><td><code>sha256:2a2f764dc42f2e0b85577e567c7eb2ed9c0b3266d98d793414dadb73fc2f0f4c</code></td><td>none</td><td><a href="/decision/4">detail</a></td></tr>
-<tr><td><a href="/decision/5">5</a></td><td><code>uid-d</code></td><td><code>regular</code></td><td><code>reports-api</code></td><td><code>CVE-D</code></td><td><code>deferred</code></td><td><code>2026-02-01T00:00:00Z</code></td><td><code>null</code></td><td><code>effective</code></td><td><code>null</code></td><td>none</td><td><a href="/decision/5">detail</a></td></tr>
-<tr><td><a href="/decision/6">6</a></td><td><code>uid-e</code></td><td><code>ephemeral</code></td><td><code>search-api</code></td><td><code>CVE-E</code></td><td><code>accepted</code></td><td><code>2026-01-01T00:00:00Z</code></td><td><code>null</code></td><td><code>effective</code></td><td><code>null</code></td><td><code>supersedes_subject_mismatch</code> </td><td><a href="/decision/6">detail</a></td></tr>
+<caption>standing</caption>
+<thead><tr><th scope="col">Standing</th><th scope="col">Count</th></tr></thead>
+<tbody>
+<tr><th scope="row">effective</th><td>3</td></tr>
+<tr><th scope="row">pending</th><td>1</td></tr>
+<tr><th scope="row">expired</th><td>1</td></tr>
+<tr><th scope="row">superseded</th><td>1</td></tr>
+</tbody>
 </table>
-<p class="limits">Absence is shown as an explicit <code>null</code> or <code>none</code>. Only the human risk decision layer is shown; no product status and no exploitability value exists in this record and none is invented.</p>
+<table>
+<caption>risk_decision</caption>
+<thead><tr><th scope="col">Risk decision</th><th scope="col">Count</th></tr></thead>
+<tbody>
+<tr><th scope="row">accepted</th><td>3</td></tr>
+<tr><th scope="row">deferred</th><td>2</td></tr>
+<tr><th scope="row">rejected</th><td>1</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+<section aria-labelledby="records-heading">
+<h2 id="records-heading">Decision records</h2>
+<div class="table-scroll" role="region" aria-label="Decision records table" tabindex="0">
+<table class="records">
+<thead>
+<tr>
+<th scope="col">sequence</th>
+<th scope="col">subject_uid</th>
+<th scope="col">container_class</th>
+<th scope="col">container_name</th>
+<th scope="col">vulnerability_id</th>
+<th scope="col">risk_decision</th>
+<th scope="col">decided_at</th>
+<th scope="col">expires_at</th>
+<th scope="col">standing</th>
+<th scope="col">superseded_by</th>
+<th scope="col">anomalies</th>
+<th scope="col">detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="/decision/1">1</a></td>
+<td>uid-a</td>
+<td>regular</td>
+<td>payments-api</td>
+<td>CVE-A</td>
+<td><span class="badge risk-accepted">accepted</span></td>
+<td class="stamp">2026-01-01T00:00:00Z</td>
+<td class="stamp">2026-06-01T00:00:00Z</td>
+<td><span class="badge standing-effective">effective</span></td>
+<td>null</td>
+<td>none</td>
+<td><a href="/decision/1">detail</a></td>
+</tr>
+<tr>
+<td><a href="/decision/2">2</a></td>
+<td>uid-b</td>
+<td>regular</td>
+<td>orders-api</td>
+<td>CVE-B</td>
+<td><span class="badge risk-deferred">deferred</span></td>
+<td class="stamp">2026-12-01T00:00:00Z</td>
+<td class="stamp">null</td>
+<td><span class="badge standing-pending">pending</span></td>
+<td>null</td>
+<td>none</td>
+<td><a href="/decision/2">detail</a></td>
+</tr>
+<tr>
+<td><a href="/decision/3">3</a></td>
+<td>uid-c</td>
+<td>init</td>
+<td>legacy-job</td>
+<td>CVE-C</td>
+<td><span class="badge risk-rejected">rejected</span></td>
+<td class="stamp">2026-01-01T00:00:00Z</td>
+<td class="stamp">2026-02-01T00:00:00Z</td>
+<td><span class="badge standing-expired">expired</span></td>
+<td>null</td>
+<td>none</td>
+<td><a href="/decision/3">detail</a></td>
+</tr>
+<tr>
+<td><a href="/decision/4">4</a></td>
+<td>uid-d</td>
+<td>regular</td>
+<td>reports-api</td>
+<td>CVE-D</td>
+<td><span class="badge risk-accepted">accepted</span></td>
+<td class="stamp">2026-01-01T00:00:00Z</td>
+<td class="stamp">null</td>
+<td><span class="badge standing-superseded">superseded</span></td>
+<td>sha256:2a2f764dc42f2e0b85577e567c7eb2ed9c0b3266d98d793414dadb73fc2f0f4c</td>
+<td>none</td>
+<td><a href="/decision/4">detail</a></td>
+</tr>
+<tr>
+<td><a href="/decision/5">5</a></td>
+<td>uid-d</td>
+<td>regular</td>
+<td>reports-api</td>
+<td>CVE-D</td>
+<td><span class="badge risk-deferred">deferred</span></td>
+<td class="stamp">2026-02-01T00:00:00Z</td>
+<td class="stamp">null</td>
+<td><span class="badge standing-effective">effective</span></td>
+<td>null</td>
+<td>none</td>
+<td><a href="/decision/5">detail</a></td>
+</tr>
+<tr>
+<td><a href="/decision/6">6</a></td>
+<td>uid-e</td>
+<td>ephemeral</td>
+<td>search-api</td>
+<td>CVE-E</td>
+<td><span class="badge risk-accepted">accepted</span></td>
+<td class="stamp">2026-01-01T00:00:00Z</td>
+<td class="stamp">null</td>
+<td><span class="badge standing-effective">effective</span></td>
+<td>null</td>
+<td><ul><li>supersedes_subject_mismatch</li></ul></td>
+<td><a href="/decision/6">detail</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section aria-labelledby="limits-heading">
+<h2 id="limits-heading">Limits</h2>
+<p>This read-only view contains human risk_decision declarations and a derived validity view. Actors and timestamps are declarations. It does not authenticate actors or authorize an exception. Missing scalar values are shown as null; empty lists as none.</p>
+</section>
+</main>
 </body>
 </html>
