@@ -59,6 +59,15 @@ func execute(call invocation, argv []string, stdout io.Writer, cwd string) *cliE
 	if call.command == commandImport {
 		return runImport(call, argv, stdout, cwd)
 	}
+	// The casefile book persistence commands (ADR-0037, task A3-11) read and
+	// write one canonical book instead of a bundle, context and pack. They
+	// branch before the evaluation order too, and never touch a bundle.
+	if call.command == commandBook {
+		return runBook(call, stdout, cwd)
+	}
+	if call.command == commandAppend {
+		return runAppend(call, stdout, cwd)
+	}
 	// Phase 1-2: every read precedes every decode, in the ratified order.
 	bundleBytes, failure := readInput(call.value("bundle"), stageBundleRead, maxBundleInputBytes, true, cwd)
 	if failure != nil {

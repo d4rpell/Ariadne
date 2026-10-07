@@ -19,6 +19,7 @@ const (
 	stageContextDecode  = "context_decode"
 	stageFindingsDecode = "findings_decode"
 	stageBindingsDecode = "bindings_decode"
+	stageCasefile       = "casefile"
 	stageImport         = "import"
 	stageEvaluate       = "evaluate"
 	stageReport         = "report"
@@ -72,6 +73,15 @@ var exitRows = []struct {
 	{stageFindingsDecode, []string{codeInvalidFindings}, 3},
 	{stageBindingsDecode, []string{codeInvalidBindings}, 3},
 	{stageImport, []string{codeInvalidBindings}, 3},
+	// The declared-decision stage of ADR-0037 travels the library code verbatim.
+	// The codes Append cannot return on an already verified book (encoding,
+	// format, sequence, chain, hash, writer) are deliberately absent: if one
+	// ever appeared it fails closed as an internal failure.
+	{stageCasefile, []string{
+		"invalid_book", "book_limit", "record_limit", "field_limit", "control_limit",
+		"invalid_decision", "invalid_actor", "invalid_rationale", "invalid_scope",
+		"invalid_control", "invalid_timestamp", "invalid_reference",
+	}, 3},
 	{stageBundleRead, []string{codeInputLimit}, 3},
 	{stageContextRead, []string{codeInputLimit}, 3},
 	{stagePackRead, []string{codeInputLimit}, 3},

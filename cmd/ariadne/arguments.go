@@ -8,8 +8,9 @@ import (
 )
 
 // Command names of the ratified surface (ADR-0023 §4.1), the read-only
-// platform server (ADR-0034, task A3-06) and the CSV-to-case import pipeline
-// (ADR-0036, task A3-09). The deferred ones are known and rejected with their
+// platform server (ADR-0034, task A3-06), the CSV-to-case import pipeline
+// (ADR-0036, task A3-09) and the casefile book persistence commands
+// (ADR-0037, task A3-11). The deferred ones are known and rejected with their
 // own code: they are not aliases and they must not appear to work.
 const (
 	commandEvaluate = "evaluate"
@@ -17,6 +18,8 @@ const (
 	commandVerify   = "verify"
 	commandServe    = "serve"
 	commandImport   = "import"
+	commandBook     = "book"
+	commandAppend   = "append"
 )
 
 var deferredCommands = []string{"normalize", "diff"}
@@ -25,7 +28,7 @@ var deferredCommands = []string{"normalize", "diff"}
 // ADR-0036. They are constants of this package, not data from any file, and
 // the tests freeze them byte a byte.
 const (
-	helpRoot = "Usage: ariadne <evaluate|report|verify|import|serve> [flags]\n" +
+	helpRoot = "Usage: ariadne <book|append|evaluate|report|verify|import|serve> [flags]\n" +
 		"Use ariadne <command> --help for required flags.\n" +
 		"Pre-alpha. Offline. Report distribution is not authorized.\n"
 	helpLastLine = "Pre-alpha. Offline. Report distribution is not authorized.\n"
@@ -42,6 +45,14 @@ var (
 	flagsVerify   = flagSet{"bundle", "bundle-hash", "pack", "context", "result-fingerprint"}
 	flagsServe    = flagSet{"casebook", "as-of", "port"}
 	flagsImport   = flagSet{"findings", "bindings", "observed-at", "out-envelope", "out-projection", "out-digest"}
+	flagsBook     = flagSet{"out"}
+	flagsAppend   = flagSet{"casebook", "decision", "owner", "approver", "rationale", "bundle-hash",
+		"subject-uid", "container-name", "container-class", "vulnerability-id",
+		"decided-at", "expires-at", "supersedes", "result-fingerprint", "controls", "out"}
+
+	// optionalAppend names the flags of append whose absence is meaningful:
+	// an undeclared expiry, no supersession, no fingerprint and no controls.
+	optionalAppend = flagSet{"expires-at", "supersedes", "result-fingerprint", "controls"}
 )
 
 // invocation is one parsed command with its flags resolved. Values are literals
@@ -80,6 +91,10 @@ func parseArguments(argv []string) (invocation, *cliError) {
 		return parseCommand(commandServe, flagsServe, argv[1:])
 	case commandImport:
 		return parseCommand(commandImport, flagsImport, argv[1:])
+	case commandBook:
+		return parseCommand(commandBook, flagsBook, argv[1:])
+	case commandAppend:
+		return parseCommand(commandAppend, flagsAppend, argv[1:])
 	}
 	for _, deferred := range deferredCommands {
 		if name == deferred {
@@ -127,8 +142,17 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 		values[name] = value
 		index++
 	}
-	// Every flag of the set is mandatory; a missing one is the same rejection.
+	// Every flag of the set is mandatory, except the declared optional flags of
+	// append (ADR-0037): their absence is declared absence, never a default
+	// value. A missing mandatory flag is the same rejection.
+	optional := flagSet(nil)
+	if command == commandAppend {
+		optional = optionalAppend
+	}
 	for _, name := range admitted {
+		if optional.has(name) {
+			continue
+		}
 		if _, present := values[name]; !present {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
@@ -136,9 +160,11 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 	// The closed vocabularies of the interface are argument grammar: a hash that
 	// is not `sha256:` plus 64 lowercase hex and a format outside json|html are
 	// the same rejection as an unknown flag, decided before any file is read.
-	// The import command carries no bundle hash: its instant is its grammar
-	// check, decided with the same rule as the server's as-of.
-	if command != commandServe && command != commandImport {
+	// Only the bundle-consuming commands carry a bundle hash. The import command
+	// carries no bundle hash: its instant is its grammar check, decided with the
+	// same rule as the server's as-of. The persistence commands of ADR-0037
+	// declare their own vocabularies in their own block below.
+	if command == commandEvaluate || command == commandReport || command == commandVerify {
 		if !isSha256Text(values["bundle-hash"]) {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
@@ -173,7 +199,63 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
 	}
+	if command == commandAppend {
+		// The declared decision carries its own closed vocabularies and reference
+		// grammars (ADR-0037): the decision and the container class admit only
+		// the casefile words, the three hashes are sha256 text and the two
+		// instants follow the stricter casefile profile, validated by the very
+		// function that consumes it — all before any file is read.
+		switch values["decision"] {
+		case string(casefile.DecisionAccepted), string(casefile.DecisionDeferred), string(casefile.DecisionRejected):
+		default:
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+		switch values["container-class"] {
+		case string(casefile.ContainerRegular), string(casefile.ContainerInit), string(casefile.ContainerEphemeral):
+		default:
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+		// Optional flags are only validated when declared: absence is absence,
+		// never an empty value to check.
+		for _, hashFlag := range []string{"bundle-hash", "supersedes", "result-fingerprint"} {
+			if _, declared := values[hashFlag]; declared && !isSha256Text(values[hashFlag]) {
+				return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+			}
+		}
+		for _, instantFlag := range []string{"decided-at", "expires-at"} {
+			if _, declared := values[instantFlag]; declared {
+				if _, err := casefile.Assess(casefile.NewBook(), values[instantFlag]); err != nil {
+					return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+				}
+			}
+		}
+		if _, declared := values["controls"]; declared {
+			if _, ok := parseControls(values["controls"]); !ok {
+				return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+			}
+		}
+	}
 	return invocation{command: command, values: values}, nil
+}
+
+// parseControls splits the declared controls list. The values are literals: no
+// trimming and no quoting. An empty element — an empty text, a leading or
+// trailing comma, or an empty position between commas — is a grammar failure,
+// because it would silently name no control. The absence of the flag is the
+// absence of declared controls, never an empty list value.
+func parseControls(text string) ([]string, bool) {
+	if text == "" {
+		return nil, true
+	}
+	parts := strings.Split(text, ",")
+	controls := make([]string, len(parts))
+	for index, part := range parts {
+		if part == "" {
+			return nil, false
+		}
+		controls[index] = part
+	}
+	return controls, true
 }
 
 // validPortText admits the decimal spelling of an integer in 1..65535: digits
@@ -219,6 +301,10 @@ func (call invocation) helpText() string {
 		return "Usage: ariadne serve --casebook PATH --as-of TIMESTAMP --port N\n" + helpLastLine
 	case call.command == commandImport:
 		return "Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH\n" + helpLastLine
+	case call.command == commandBook:
+		return "Usage: ariadne book --out PATH\n" + helpLastLine
+	case call.command == commandAppend:
+		return "Usage: ariadne append --casebook PATH --decision accepted|deferred|rejected --owner TEXT --approver TEXT --rationale TEXT --bundle-hash H --subject-uid TEXT --container-name TEXT --container-class regular|init|ephemeral --vulnerability-id TEXT --decided-at TIMESTAMP [--expires-at TIMESTAMP] [--supersedes H] [--result-fingerprint H] [--controls LIST] --out PATH\n" + helpLastLine
 	}
 	return ""
 }
