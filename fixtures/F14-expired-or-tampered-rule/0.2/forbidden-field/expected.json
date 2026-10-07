@@ -1,0 +1,8 @@
+{
+  "entry_point": "Admit",
+  "evaluated_at": "2026-10-01T12:00:00Z",
+  "expected_pack_id": "pack.ax04",
+  "minimum_version": 1,
+  "pack_sha256": "sha256:e49fff07ebf3948914db417ad1dd7029f593589f704c74068e8ea5cff0788bba",
+  "error_code": "invalid_pack"
+}
