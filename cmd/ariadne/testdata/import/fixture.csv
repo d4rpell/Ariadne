@@ -1,0 +1,3 @@
+schema_version,vulnerability_id,package_name,installed_version,fix_status,image_registry,image_repository,image_tag,severity
+1.0,CVE-2026-1001,openssl,1.1.1k,fixed,registry.example,payments/api,release,high
+1.0,CVE-2026-1002,zlib,1.2.13,not_fixed,registry.example,payments/api,release,high

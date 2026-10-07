@@ -1,0 +1,2 @@
+Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH
+Pre-alpha. Offline. Report distribution is not authorized.

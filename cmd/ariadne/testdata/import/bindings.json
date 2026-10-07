@@ -1,0 +1,30 @@
+{
+  "format": "case-import-bindings-v1",
+  "version": "1.0",
+  "subject": {
+    "cluster_alias": "cluster-a",
+    "namespace": "payments",
+    "kind": "Pod",
+    "name": "payments-api",
+    "uid": "11111111-2222-3333-4444-555555555555",
+    "owner_chain": "deployments/payments-api"
+  },
+  "containers": [
+    {
+      "container_name": "api",
+      "container_class": "regular",
+      "observed_at": "2026-10-07T09:00:00Z",
+      "requested_image": {"registry": "registry.example", "repository": "payments/api", "tag": "release"},
+      "raw_image_id": "registry.example/payments/api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "normalized_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "platform": {"status": "known", "os": "linux", "architecture": "amd64"},
+      "source_name": "sanitized-pods.json",
+      "source_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "locator": "items[0].status.containerStatuses[0].imageID"
+    }
+  ],
+  "bindings": [
+    {"finding_index": 0, "container_name": "api", "container_class": "regular"},
+    {"finding_index": 1, "container_name": "api", "container_class": "regular"}
+  ]
+}

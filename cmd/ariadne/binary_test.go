@@ -56,10 +56,10 @@ var requiredScenarios = map[string]bool{
 	"help/evaluate": true,
 	"help/report":   true,
 	"help/verify":   true,
+	"help/import":   true,
 
 	"error/no arguments":                  true,
 	"error/unknown command":               true,
-	"error/deferred import with help":     true,
 	"error/deferred normalize":            true,
 	"error/deferred diff":                 true,
 	"error/help mixed with flags":         true,
@@ -323,6 +323,7 @@ func TestBinaryHelpGoldens(t *testing.T) {
 		{"evaluate", []string{"evaluate", "--help"}, "evaluate.txt"},
 		{"report", []string{"report", "--help"}, "report.txt"},
 		{"verify", []string{"verify", "--help"}, "verify.txt"},
+		{"import", []string{"import", "--help"}, "import.txt"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -384,7 +385,6 @@ func TestBinaryDiagnosticsExact(t *testing.T) {
 	}{
 		{"no arguments", nil, 2, stageArguments, codeInvalidArguments},
 		{"unknown command", []string{"frobnicate"}, 2, stageArguments, codeUnknownCommand},
-		{"deferred import with help", []string{"import", "--help"}, 2, stageArguments, codeCommandDeferred},
 		{"deferred normalize", []string{"normalize"}, 2, stageArguments, codeCommandDeferred},
 		{"deferred diff", []string{"diff"}, 2, stageArguments, codeCommandDeferred},
 		{"help mixed with flags", []string{"evaluate", "--help", "--bundle", figures.bundle}, 2, stageArguments, codeInvalidArguments},

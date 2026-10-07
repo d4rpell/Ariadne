@@ -54,6 +54,21 @@ var a108ExitTable = []struct {
 	{"pack_read", "invalid_file", 4},
 	{"pack_read", "read_failure", 4},
 	{"pack_read", "timeout", 4},
+	{"findings_read", "input_limit", 3},
+	{"findings_read", "not_found", 4},
+	{"findings_read", "permission_denied", 4},
+	{"findings_read", "invalid_file", 4},
+	{"findings_read", "read_failure", 4},
+	{"findings_read", "timeout", 4},
+	{"bindings_read", "input_limit", 3},
+	{"bindings_read", "not_found", 4},
+	{"bindings_read", "permission_denied", 4},
+	{"bindings_read", "invalid_file", 4},
+	{"bindings_read", "read_failure", 4},
+	{"bindings_read", "timeout", 4},
+	{"findings_decode", "invalid_findings", 3},
+	{"bindings_decode", "invalid_bindings", 3},
+	{"import", "invalid_bindings", 3},
 	{"output_write", "already_exists", 4},
 	{"output_write", "permission_denied", 4},
 	{"output_write", "invalid_file", 4},
@@ -77,8 +92,8 @@ var a108ExitTable = []struct {
 // resolves to its stage, code, exit and exact diagnostic bytes, and the
 // independent table and the production table are equal as sets.
 func TestA108AllDiagnosticBytes(t *testing.T) {
-	if len(a108ExitTable) != 56 {
-		t.Fatalf("the independent table carries %d pairs, want the ratified 56", len(a108ExitTable))
+	if len(a108ExitTable) != 71 {
+		t.Fatalf("the independent table carries %d pairs, want the ratified 71", len(a108ExitTable))
 	}
 
 	t.Run("every pair produces its exact diagnostic line", func(t *testing.T) {
@@ -387,7 +402,7 @@ func TestA108FlagMatrix(t *testing.T) {
 				t.Fatalf("%v: exit = %d, stderr = %q; want exit 0 and clean stderr", argv, exit, stderr)
 			}
 		}
-		for _, name := range []string{"import", "normalize", "diff"} {
+		for _, name := range []string{"normalize", "diff"} {
 			t.Run(name+" deferred", func(t *testing.T) {
 				exit, stdout, stderr := runCLI(t, []string{name})
 				if exit != 2 || stdout != "" {

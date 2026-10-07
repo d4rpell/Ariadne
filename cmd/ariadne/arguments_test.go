@@ -120,7 +120,7 @@ func TestArgumentsHelpExact(t *testing.T) {
 		want string
 	}{
 		{[]string{"--help"},
-			"Usage: ariadne <evaluate|report|verify|serve> [flags]\n" +
+			"Usage: ariadne <evaluate|report|verify|import|serve> [flags]\n" +
 				"Use ariadne <command> --help for required flags.\n" +
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 		{[]string{"evaluate", "--help"},
@@ -134,6 +134,9 @@ func TestArgumentsHelpExact(t *testing.T) {
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 		{[]string{"serve", "--help"},
 			"Usage: ariadne serve --casebook PATH --as-of TIMESTAMP --port N\n" +
+				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+		{[]string{"import", "--help"},
+			"Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH\n" +
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 	}
 	for _, testCase := range cases {
