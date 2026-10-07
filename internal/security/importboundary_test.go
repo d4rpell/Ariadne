@@ -433,6 +433,76 @@ func TestCLINetworkGrantIsScoped(t *testing.T) {
 	}
 }
 
+// TestImportBoundaryIntermediateCoverage anchors the ADR-0014 scenario to the
+// real tree. The closure analyzer is what catches a forbidden import reached
+// through a module-local package that is not itself a declared boundary root,
+// from a source file the active build excludes; the synthetic cases prove the
+// analyzer does that, but they would keep passing if the repository stopped
+// having any such intermediate, leaving the scenario real only in the fixture.
+// The evaluator must keep reaching the unprotected intermediate internal/evidence
+// directly, so the premise stays true of the tree the gate actually protects.
+func TestImportBoundaryIntermediateCoverage(t *testing.T) {
+	const modulePrefix = "github.com/d4rpell/Ariadne/"
+
+	protected := map[string]bool{}
+	for _, boundary := range importBoundaries {
+		protected[boundary.dir] = true
+	}
+
+	// reachedBy records, for every unprotected module-local package, which
+	// protected roots import it directly, so the assertion below names the root it
+	// depends on instead of accepting any root.
+	reachedBy := map[string]map[string]bool{}
+	for _, boundary := range importBoundaries {
+		// A stdlib-only root (internal/casefile) reaches no local package at all,
+		// so it can never contribute an intermediate; it is skipped on purpose.
+		if boundary.stdlibOnly {
+			continue
+		}
+		for _, found := range scanDirectImports(t, goListDir(t, boundary.target)) {
+			if !strings.HasPrefix(found.path, modulePrefix) {
+				continue
+			}
+			relative := strings.TrimPrefix(found.path, modulePrefix)
+			if protected[relative] {
+				continue
+			}
+			if reachedBy[relative] == nil {
+				reachedBy[relative] = map[string]bool{}
+			}
+			reachedBy[relative][boundary.name] = true
+		}
+	}
+
+	// Non-omission control: the evaluator imports internal/evidence, which is not
+	// a root of the gate; if the enumeration stopped seeing that edge the anchor
+	// would be vacuous. The provenance is checked, not only the membership, so
+	// another root reaching the same package cannot keep this test green.
+	if !reachedBy["internal/evidence"]["evaluator"] {
+		t.Fatalf("the evaluator no longer reaches the unprotected intermediate internal/evidence; reached by: %s", reachedByText(reachedBy))
+	}
+}
+
+// reachedByText renders the provenance map deterministically, so a failure
+// message does not depend on map iteration order.
+func reachedByText(reachedBy map[string]map[string]bool) string {
+	packages := make([]string, 0, len(reachedBy))
+	for pkg := range reachedBy {
+		packages = append(packages, pkg)
+	}
+	slices.Sort(packages)
+	parts := make([]string, 0, len(packages))
+	for _, pkg := range packages {
+		roots := make([]string, 0, len(reachedBy[pkg]))
+		for root := range reachedBy[pkg] {
+			roots = append(roots, root)
+		}
+		slices.Sort(roots)
+		parts = append(parts, pkg+"<=["+strings.Join(roots, " ")+"]")
+	}
+	return strings.Join(parts, " ")
+}
+
 func forbiddenMatch(path string, exact, trees []string) string {
 	if slices.Contains(exact, path) {
 		return path
