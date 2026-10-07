@@ -414,7 +414,9 @@ func TestA108FlagMatrix(t *testing.T) {
 				t.Fatalf("%v: exit = %d, stderr = %q; want exit 0 and clean stderr", argv, exit, stderr)
 			}
 		}
-		for _, name := range []string{"normalize", "diff"} {
+		// `normalize` stays deferred (ADR-0036); `diff` became a real command in
+		// ADR-0038, so its bare invocation is an argument rejection, not a deferral.
+		for _, name := range []string{"normalize"} {
 			t.Run(name+" deferred", func(t *testing.T) {
 				exit, stdout, stderr := runCLI(t, []string{name})
 				if exit != 2 || stdout != "" {
@@ -426,6 +428,16 @@ func TestA108FlagMatrix(t *testing.T) {
 				}
 			})
 		}
+		t.Run("diff is not deferred", func(t *testing.T) {
+			exit, stdout, stderr := runCLI(t, []string{"diff"})
+			if exit != 2 || stdout != "" {
+				t.Fatalf("exit = %d, stdout = %q; want the argument rejection", exit, stdout)
+			}
+			want := `{"error":{"stage":"arguments","code":"invalid_arguments","message":"ariadne: invalid_arguments"}}` + "\n"
+			if stderr != want {
+				t.Fatalf("stderr = %q, want %q", stderr, want)
+			}
+		})
 	})
 }
 

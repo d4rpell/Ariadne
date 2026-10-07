@@ -61,16 +61,20 @@ var requiredScenarios = map[string]bool{
 	"help/import":   true,
 	"help/book":     true,
 	"help/append":   true,
+	"help/diff":     true,
 
 	"casefile/book-empty":      true,
 	"casefile/append-minimal":  true,
 	"casefile/append-full":     true,
 	"casefile/append-rejected": true,
 
+	"diff/document":          true,
+	"diff/inverted-interval": true,
+
 	"error/no arguments":                  true,
 	"error/unknown command":               true,
 	"error/deferred normalize":            true,
-	"error/deferred diff":                 true,
+	"error/diff without flags":            true,
 	"error/help mixed with flags":         true,
 	"error/unknown flag":                  true,
 	"error/flag of another command":       true,
@@ -335,6 +339,7 @@ func TestBinaryHelpGoldens(t *testing.T) {
 		{"import", []string{"import", "--help"}, "import.txt"},
 		{"book", []string{"book", "--help"}, "book.txt"},
 		{"append", []string{"append", "--help"}, "append.txt"},
+		{"diff", []string{"diff", "--help"}, "diff.txt"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -397,7 +402,7 @@ func TestBinaryDiagnosticsExact(t *testing.T) {
 		{"no arguments", nil, 2, stageArguments, codeInvalidArguments},
 		{"unknown command", []string{"frobnicate"}, 2, stageArguments, codeUnknownCommand},
 		{"deferred normalize", []string{"normalize"}, 2, stageArguments, codeCommandDeferred},
-		{"deferred diff", []string{"diff"}, 2, stageArguments, codeCommandDeferred},
+		{"diff without flags", []string{"diff"}, 2, stageArguments, codeInvalidArguments},
 		{"help mixed with flags", []string{"evaluate", "--help", "--bundle", figures.bundle}, 2, stageArguments, codeInvalidArguments},
 		{"unknown flag", withEvaluate("--extra", "x"), 2, stageArguments, codeInvalidArguments},
 		{"flag of another command", withEvaluate("--format", "json"), 2, stageArguments, codeInvalidArguments},
@@ -582,6 +587,56 @@ func TestBinaryCasefilePersistence(t *testing.T) {
 			t.Fatalf("a rejected append created a file")
 		}
 		recordScenario(t, "casefile/append-rejected")
+	})
+}
+
+// TestBinaryDiff exercises the validity-diff command of ADR-0038 over the real
+// process: the document matches the independent oracle golden byte a byte, the
+// receipt is exact, and an inverted interval is refused before any read.
+func TestBinaryDiff(t *testing.T) {
+	dir := t.TempDir()
+	book, err := filepath.Abs(filepath.Join("testdata", "diff", "book.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("document", func(t *testing.T) {
+		out := filepath.Join(dir, "diff.json")
+		run := runBinary(t, dir, "diff",
+			"--casebook", book,
+			"--since", "2026-02-01T00:00:00Z",
+			"--as-of", "2026-05-01T00:00:00Z",
+			"--out", out)
+		if run.exit != 0 || len(run.stderr) != 0 {
+			t.Fatalf("diff exit = %d stderr = %q", run.exit, run.stderr)
+		}
+		if string(run.stdout) != "{\"subjects\":6,\"changed\":4}\n" {
+			t.Fatalf("receipt = %q", run.stdout)
+		}
+		golden := readGolden(t, "testdata", "diff", "golden.json")
+		if got := readTemp(t, out); !bytes.Equal(got, golden) {
+			t.Fatalf("document differs from the oracle golden:\ngot  %s\nwant %s", got, golden)
+		}
+		recordScenario(t, "diff/document")
+	})
+
+	t.Run("inverted-interval", func(t *testing.T) {
+		absent := filepath.Join(dir, "absent.json")
+		run := runBinary(t, dir, "diff",
+			"--casebook", absent,
+			"--since", "2026-05-01T00:00:00Z",
+			"--as-of", "2026-02-01T00:00:00Z",
+			"--out", filepath.Join(dir, "never.json"))
+		if run.exit != 2 || len(run.stdout) != 0 {
+			t.Fatalf("exit = %d stdout = %q", run.exit, run.stdout)
+		}
+		if want := diagnosticLine(stageArguments, codeInvalidArguments); !bytes.Equal(run.stderr, want) {
+			t.Fatalf("stderr = %q, want %q", run.stderr, want)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "never.json")); !os.IsNotExist(err) {
+			t.Fatalf("a rejection created the destination")
+		}
+		recordScenario(t, "diff/inverted-interval")
 	})
 }
 

@@ -1,0 +1,2 @@
+Usage: ariadne diff --casebook PATH --since TIMESTAMP --as-of TIMESTAMP --out PATH
+Pre-alpha. Offline. Report distribution is not authorized.
