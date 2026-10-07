@@ -1,6 +1,6 @@
 # ADR-0036: CLI `import` — the CSV-to-case pipeline, end to end
 
-- **Status**: proposed (2026-10-07). Pending independent review (task A3-09) and owner ratification.
+- **Status**: ratified by the owner (2026-10-07; proposed 2026-10-07). Implemented, independently reviewed and published.
 - **Task**: A3-09.
 - **Relation**: refines ADR-0023 (the deferred `import`/`normalize` subset becomes "`import` implemented; `normalize` still deferred"); builds on the ratified evidence bundle, `prisma-v1` ingestion, image identity, bundle integration and CLI contracts (ADR-0006..0012, ADR-0023) and on the case-record records (ADR-0030/0031). No change to the `0.2` evidence bundle wire.
 

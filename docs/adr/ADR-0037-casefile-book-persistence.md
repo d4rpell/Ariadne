@@ -1,6 +1,6 @@
 # ADR-0037: Casefile book persistence on disk (`book` and `append`)
 
-- **Status**: proposed (2026-10-07). Task A3-11. Independent review and owner ratification pending.
+- **Status**: ratified by the owner (2026-10-07; proposed 2026-10-07). Task A3-11. Implemented and independently reviewed.
 - **Relation**: extends the ADR-0023 CLI surface with two commands and one error stage; no wire, state, budget or exit-code changes. Builds on ADR-0030 (casefile library), ADR-0031 (validity view), ADR-0034 (governance platform) and ADR-0036 (precedent for declared surface extensions).
 
 ## Decision

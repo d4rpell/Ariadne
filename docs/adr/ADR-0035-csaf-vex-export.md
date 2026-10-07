@@ -1,6 +1,6 @@
 # ADR-0035: CSAF 2.0 VEX export from an evaluation result
 
-- **Status:** proposed (2026-10-06). Not ratified and not implemented. Task A3-08.
+- **Status:** ratified by the owner (2026-10-07; proposed 2026-10-06). Implemented, independently reviewed and published. Task A3-08.
 - **Scope:** contract for a new output surface in the `internal/interop` package (twelfth root of the import gate, ADR-0032). Adds no gate root.
 - **Relationships:** applies [ADR-0004](ADR-0004-no-exec-human-decision.md) (no hidden clock), [ADR-0011](ADR-0011-decision-record-policy.md) (two-layer record policy) and the deterministic-presentation model of [ADR-0022](ADR-0022-json-and-html-report-contract.md), including its **no-authorized-distribution** rule. Reuses the rigor of [ADR-0032](ADR-0032-vex-and-sarif-exports.md) without changing the wire. Closes restriction D3 of A3-04 and escalation ES-1. Supersedes no accepted record.
 
