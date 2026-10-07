@@ -20,15 +20,16 @@ const (
 	commandImport   = "import"
 	commandBook     = "book"
 	commandAppend   = "append"
+	commandDiff     = "diff"
 )
 
-var deferredCommands = []string{"normalize", "diff"}
+var deferredCommands = []string{"normalize"}
 
 // helpLines are the exact ratified texts of ADR-0023 §4.1 as extended by
-// ADR-0036. They are constants of this package, not data from any file, and
-// the tests freeze them byte a byte.
+// ADR-0036, ADR-0037 and ADR-0038. They are constants of this package, not data
+// from any file, and the tests freeze them byte a byte.
 const (
-	helpRoot = "Usage: ariadne <book|append|evaluate|report|verify|import|serve> [flags]\n" +
+	helpRoot = "Usage: ariadne <book|append|diff|evaluate|report|verify|import|serve> [flags]\n" +
 		"Use ariadne <command> --help for required flags.\n" +
 		"Pre-alpha. Offline. Report distribution is not authorized.\n"
 	helpLastLine = "Pre-alpha. Offline. Report distribution is not authorized.\n"
@@ -49,6 +50,7 @@ var (
 	flagsAppend   = flagSet{"casebook", "decision", "owner", "approver", "rationale", "bundle-hash",
 		"subject-uid", "container-name", "container-class", "vulnerability-id",
 		"decided-at", "expires-at", "supersedes", "result-fingerprint", "controls", "out"}
+	flagsDiff = flagSet{"casebook", "since", "as-of", "out"}
 
 	// optionalAppend names the flags of append whose absence is meaningful:
 	// an undeclared expiry, no supersession, no fingerprint and no controls.
@@ -95,6 +97,8 @@ func parseArguments(argv []string) (invocation, *cliError) {
 		return parseCommand(commandBook, flagsBook, argv[1:])
 	case commandAppend:
 		return parseCommand(commandAppend, flagsAppend, argv[1:])
+	case commandDiff:
+		return parseCommand(commandDiff, flagsDiff, argv[1:])
 	}
 	for _, deferred := range deferredCommands {
 		if name == deferred {
@@ -235,6 +239,20 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 			}
 		}
 	}
+	if command == commandDiff {
+		// The two instants follow the stricter casefile profile and are validated by
+		// the very function that consumes them; the interval must not be inverted —
+		// the canonical form is zero-padded, so byte order is chronological — all
+		// before any file is read.
+		for _, instantFlag := range []string{"since", "as-of"} {
+			if _, err := casefile.Assess(casefile.NewBook(), values[instantFlag]); err != nil {
+				return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+			}
+		}
+		if values["since"] > values["as-of"] {
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+	}
 	return invocation{command: command, values: values}, nil
 }
 
@@ -305,6 +323,8 @@ func (call invocation) helpText() string {
 		return "Usage: ariadne book --out PATH\n" + helpLastLine
 	case call.command == commandAppend:
 		return "Usage: ariadne append --casebook PATH --decision accepted|deferred|rejected --owner TEXT --approver TEXT --rationale TEXT --bundle-hash H --subject-uid TEXT --container-name TEXT --container-class regular|init|ephemeral --vulnerability-id TEXT --decided-at TIMESTAMP [--expires-at TIMESTAMP] [--supersedes H] [--result-fingerprint H] [--controls LIST] --out PATH\n" + helpLastLine
+	case call.command == commandDiff:
+		return "Usage: ariadne diff --casebook PATH --since TIMESTAMP --as-of TIMESTAMP --out PATH\n" + helpLastLine
 	}
 	return ""
 }

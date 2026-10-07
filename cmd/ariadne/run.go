@@ -68,6 +68,12 @@ func execute(call invocation, argv []string, stdout io.Writer, cwd string) *cliE
 	if call.command == commandAppend {
 		return runAppend(call, stdout, cwd)
 	}
+	// The validity diff of ADR-0038 (task A3-10) reads one canonical book and two
+	// declared instants instead of a bundle, context and pack. It branches before
+	// the evaluation order too, and never touches a bundle.
+	if call.command == commandDiff {
+		return runDiff(call, stdout, cwd)
+	}
 	// Phase 1-2: every read precedes every decode, in the ratified order.
 	bundleBytes, failure := readInput(call.value("bundle"), stageBundleRead, maxBundleInputBytes, true, cwd)
 	if failure != nil {
