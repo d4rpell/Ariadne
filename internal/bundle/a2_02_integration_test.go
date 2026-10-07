@@ -1,6 +1,7 @@
 package bundle_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -285,16 +286,25 @@ func TestA202PublicationBoundary(t *testing.T) {
 			t.Fatal("a capture that does not exist produced a bundle")
 		}
 	})
-	t.Run("discarded_fields_absent", func(t *testing.T) {
-		// The sanitized grammar admits only the projected fields, so a discarded
-		// marker cannot be present in the document at all; the control proves a
-		// marker placed in a discarded field never reaches the bundle.
-		marker := "SYNTHETIC-DISCARDED-MARKER"
-		document := a202Document(`{"apiVersion":"v1","kind":"Pod","metadata":{"uid":"u1","namespace":"` + a202Namespace + `","name":"n1"},` +
+	t.Run("admitted_value_the_wire_does_not_publish", func(t *testing.T) {
+		// metadata.resourceVersion is admitted by the sanitized grammar, so the
+		// marker really travels inside the admitted source and the capture
+		// record; the wire 0.2 publishes no resource version, so no artefact may
+		// carry it. The positive half is asserted too: without it — as in the
+		// earlier version of this case, whose document held no marker at all —
+		// the search could never fail and would prove nothing.
+		marker := "SYNTHETIC-ADMITTED-MARKER-7f3a"
+		document := `{"apiVersion":"v1","kind":"PodList","metadata":{"resourceVersion":"` + marker + `"},"items":[` +
+			`{"apiVersion":"v1","kind":"Pod","metadata":{"uid":"u1","namespace":"` + a202Namespace + `","name":"n1","resourceVersion":"` + marker + `"},` +
 			`"spec":{"containers":[{"name":"api","image":"` + a202Image + `"}]},` +
-			`"status":{"containerStatuses":[{"name":"api","imageID":"` + a202ImageID + `"}]}}`)
+			`"status":{"containerStatuses":[{"name":"api","imageID":"` + a202ImageID + `"}]}}]}`
 		source := a202BuildSource(t, document, "capture-000001.json", contract.TerminationFinished)
+		if !strings.Contains(string(source.Bytes), marker) {
+			t.Fatal("the marker was not admitted into the sanitized source: the negative half would be vacuous")
+		}
 		acquisition := a202Acquisition(t, []a202Source{source}, contract.TerminationFinished, nil)
+		acquisition.Captures[0].ListResourceVersion = marker
+		acquisition.Captures[0].ListResourceVersionPresence = true
 		built, _, err := bundle.BuildCollectedObservation(a202Input(acquisition, 1, 0))
 		if err != nil {
 			t.Fatalf("build: %v", err)
@@ -303,9 +313,9 @@ func TestA202PublicationBoundary(t *testing.T) {
 		if err != nil {
 			t.Fatalf("encode: %v", err)
 		}
-		for _, artefact := range [][]byte{encoded.Envelope, encoded.HashInput} {
-			if strings.Contains(string(artefact), marker) {
-				t.Fatal("a discarded marker reached a published artefact")
+		for name, artefact := range map[string][]byte{"envelope": encoded.Envelope, "hash projection": encoded.HashInput} {
+			if bytes.Contains(artefact, []byte(marker)) {
+				t.Fatalf("the %s carries the admitted value that the wire does not publish", name)
 			}
 		}
 	})
