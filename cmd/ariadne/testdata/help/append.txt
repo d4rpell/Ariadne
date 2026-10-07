@@ -1,0 +1,2 @@
+Usage: ariadne append --casebook PATH --decision accepted|deferred|rejected --owner TEXT --approver TEXT --rationale TEXT --bundle-hash H --subject-uid TEXT --container-name TEXT --container-class regular|init|ephemeral --vulnerability-id TEXT --decided-at TIMESTAMP [--expires-at TIMESTAMP] [--supersedes H] [--result-fingerprint H] [--controls LIST] --out PATH
+Pre-alpha. Offline. Report distribution is not authorized.

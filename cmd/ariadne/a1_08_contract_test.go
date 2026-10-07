@@ -61,6 +61,18 @@ var a108ExitTable = []struct {
 	{"findings_read", "read_failure", 4},
 	{"findings_read", "timeout", 4},
 	{"bindings_read", "input_limit", 3},
+	{"casefile", "invalid_book", 3},
+	{"casefile", "book_limit", 3},
+	{"casefile", "record_limit", 3},
+	{"casefile", "field_limit", 3},
+	{"casefile", "control_limit", 3},
+	{"casefile", "invalid_decision", 3},
+	{"casefile", "invalid_actor", 3},
+	{"casefile", "invalid_rationale", 3},
+	{"casefile", "invalid_scope", 3},
+	{"casefile", "invalid_control", 3},
+	{"casefile", "invalid_timestamp", 3},
+	{"casefile", "invalid_reference", 3},
 	{"bindings_read", "not_found", 4},
 	{"bindings_read", "permission_denied", 4},
 	{"bindings_read", "invalid_file", 4},
@@ -92,8 +104,8 @@ var a108ExitTable = []struct {
 // resolves to its stage, code, exit and exact diagnostic bytes, and the
 // independent table and the production table are equal as sets.
 func TestA108AllDiagnosticBytes(t *testing.T) {
-	if len(a108ExitTable) != 71 {
-		t.Fatalf("the independent table carries %d pairs, want the ratified 71", len(a108ExitTable))
+	if len(a108ExitTable) != 83 {
+		t.Fatalf("the independent table carries %d pairs, want the ratified 83", len(a108ExitTable))
 	}
 
 	t.Run("every pair produces its exact diagnostic line", func(t *testing.T) {

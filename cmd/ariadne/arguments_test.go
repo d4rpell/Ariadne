@@ -120,7 +120,7 @@ func TestArgumentsHelpExact(t *testing.T) {
 		want string
 	}{
 		{[]string{"--help"},
-			"Usage: ariadne <evaluate|report|verify|import|serve> [flags]\n" +
+			"Usage: ariadne <book|append|evaluate|report|verify|import|serve> [flags]\n" +
 				"Use ariadne <command> --help for required flags.\n" +
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 		{[]string{"evaluate", "--help"},
@@ -137,6 +137,12 @@ func TestArgumentsHelpExact(t *testing.T) {
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 		{[]string{"import", "--help"},
 			"Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH\n" +
+				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+		{[]string{"book", "--help"},
+			"Usage: ariadne book --out PATH\n" +
+				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+		{[]string{"append", "--help"},
+			"Usage: ariadne append --casebook PATH --decision accepted|deferred|rejected --owner TEXT --approver TEXT --rationale TEXT --bundle-hash H --subject-uid TEXT --container-name TEXT --container-class regular|init|ephemeral --vulnerability-id TEXT --decided-at TIMESTAMP [--expires-at TIMESTAMP] [--supersedes H] [--result-fingerprint H] [--controls LIST] --out PATH\n" +
 				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
 	}
 	for _, testCase := range cases {

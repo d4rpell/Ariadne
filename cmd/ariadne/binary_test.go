@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/d4rpell/Ariadne/internal/casefile"
 )
 
 // F3 — the real-binary harness (ADR-0023 §5.5).
@@ -57,6 +59,13 @@ var requiredScenarios = map[string]bool{
 	"help/report":   true,
 	"help/verify":   true,
 	"help/import":   true,
+	"help/book":     true,
+	"help/append":   true,
+
+	"casefile/book-empty":      true,
+	"casefile/append-minimal":  true,
+	"casefile/append-full":     true,
+	"casefile/append-rejected": true,
 
 	"error/no arguments":                  true,
 	"error/unknown command":               true,
@@ -324,6 +333,8 @@ func TestBinaryHelpGoldens(t *testing.T) {
 		{"report", []string{"report", "--help"}, "report.txt"},
 		{"verify", []string{"verify", "--help"}, "verify.txt"},
 		{"import", []string{"import", "--help"}, "import.txt"},
+		{"book", []string{"book", "--help"}, "book.txt"},
+		{"append", []string{"append", "--help"}, "append.txt"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -483,6 +494,122 @@ func TestBinaryVerifyRoundTrip(t *testing.T) {
 		t.Fatalf("verify exit = %d stdout = %q stderr = %q", accepted.exit, accepted.stdout, accepted.stderr)
 	}
 	recordScenario(t, "verify/f09")
+}
+
+// TestBinaryCasefilePersistence exercises the book persistence commands of
+// ADR-0037 over the real process: the empty book, a minimal append and an
+// append carrying every optional. The produced documents are cross-checked
+// against the casefile library — the only oracle of the on-disk format — and
+// the receipts are frozen byte a byte beside the other transport goldens.
+func TestBinaryCasefilePersistence(t *testing.T) {
+	dir := t.TempDir()
+	emptyBook := filepath.Join(dir, "empty.json")
+
+	t.Run("book-empty", func(t *testing.T) {
+		run := runBinary(t, dir, "book", "--out", emptyBook)
+		if run.exit != 0 || len(run.stderr) != 0 {
+			t.Fatalf("book exit = %d stderr = %q", run.exit, run.stderr)
+		}
+		golden := readGolden(t, "testdata", "casefile", "book.receipt.json")
+		if !bytes.Equal(run.stdout, golden) {
+			t.Fatalf("receipt differs from the frozen golden:\ngot  %q\nwant %q", run.stdout, golden)
+		}
+		want, err := casefile.Encode(casefile.NewBook())
+		if err != nil {
+			t.Fatalf("oracle encode: %v", err)
+		}
+		if got := readTemp(t, emptyBook); !bytes.Equal(got, want) {
+			t.Fatalf("book bytes differ from the canonical empty book")
+		}
+		recordScenario(t, "casefile/book-empty")
+	})
+
+	appendMinimal := appendCasefileBase(emptyBook, filepath.Join(dir, "minimal.json"))
+	t.Run("append-minimal", func(t *testing.T) {
+		run := runBinary(t, dir, appendMinimal...)
+		if run.exit != 0 || len(run.stderr) != 0 {
+			t.Fatalf("append exit = %d stderr = %q", run.exit, run.stderr)
+		}
+		golden := readGolden(t, "testdata", "casefile", "append-minimal.receipt.json")
+		if !bytes.Equal(run.stdout, golden) {
+			t.Fatalf("receipt differs from the frozen golden:\ngot  %q\nwant %q", run.stdout, golden)
+		}
+		if _, err := casefile.Verify(readTemp(t, filepath.Join(dir, "minimal.json"))); err != nil {
+			t.Fatalf("the produced book is not admitted: %v", err)
+		}
+		recordScenario(t, "casefile/append-minimal")
+	})
+
+	t.Run("append-full", func(t *testing.T) {
+		admitted, err := casefile.Verify(readTemp(t, filepath.Join(dir, "minimal.json")))
+		if err != nil {
+			t.Fatalf("minimal book not admitted: %v", err)
+		}
+		head, err := casefile.HeadHash(admitted)
+		if err != nil {
+			t.Fatalf("head: %v", err)
+		}
+		out := filepath.Join(dir, "full.json")
+		argv := append(appendCasefileBase(filepath.Join(dir, "minimal.json"), out),
+			"--expires-at", "2027-01-01T00:00:00Z",
+			"--supersedes", head,
+			"--result-fingerprint", "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+			"--controls", "change-control-1,ticket-42")
+		run := runBinary(t, dir, argv...)
+		if run.exit != 0 || len(run.stderr) != 0 {
+			t.Fatalf("append exit = %d stderr = %q", run.exit, run.stderr)
+		}
+		golden := readGolden(t, "testdata", "casefile", "append-full.receipt.json")
+		if !bytes.Equal(run.stdout, golden) {
+			t.Fatalf("receipt differs from the frozen golden:\ngot  %q\nwant %q", run.stdout, golden)
+		}
+		if _, err := casefile.Verify(readTemp(t, out)); err != nil {
+			t.Fatalf("the produced book is not admitted: %v", err)
+		}
+		recordScenario(t, "casefile/append-full")
+	})
+
+	t.Run("append-rejected", func(t *testing.T) {
+		run := runBinary(t, dir, replaceCasefileValue(appendCasefileBase(emptyBook, filepath.Join(dir, "never.json")),
+			"--decision", "maybe")...)
+		if run.exit != 2 || len(run.stdout) != 0 {
+			t.Fatalf("exit = %d stdout = %q", run.exit, run.stdout)
+		}
+		if want := diagnosticLine(stageArguments, codeInvalidArguments); !bytes.Equal(run.stderr, want) {
+			t.Fatalf("stderr = %q, want %q", run.stderr, want)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "never.json")); !os.IsNotExist(err) {
+			t.Fatalf("a rejected append created a file")
+		}
+		recordScenario(t, "casefile/append-rejected")
+	})
+}
+
+// appendCasefileBase composes the minimal declared append over one casebook.
+func appendCasefileBase(casebook, out string) []string {
+	return []string{"append",
+		"--casebook", casebook,
+		"--decision", "accepted",
+		"--owner", "owner-example",
+		"--approver", "approver-example",
+		"--rationale", "synthetic rationale",
+		"--bundle-hash", "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"--subject-uid", "uid-1",
+		"--container-name", "api",
+		"--container-class", "regular",
+		"--vulnerability-id", "CVE-2026-1001",
+		"--decided-at", "2026-10-07T00:00:00Z",
+		"--out", out}
+}
+
+func replaceCasefileValue(argv []string, flag, value string) []string {
+	for index, token := range argv {
+		if token == flag {
+			argv[index+1] = value
+			return argv
+		}
+	}
+	return argv
 }
 
 // TestBinaryReportParityWithReviewedGoldens writes reports with the real binary

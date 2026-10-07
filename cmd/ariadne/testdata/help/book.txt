@@ -1,0 +1,2 @@
+Usage: ariadne book --out PATH
+Pre-alpha. Offline. Report distribution is not authorized.
