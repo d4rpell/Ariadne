@@ -367,10 +367,22 @@ func TestCLINetworkGrantIsScoped(t *testing.T) {
 			t.Errorf("cliStdlibAllowlist must not contain %q in its base list", pkg)
 		}
 	}
+	// Read the grant from the real CLI boundary declaration, not a local copy:
+	// otherwise a widened production networkDirs would leave this test green
+	// while the boundary it names had changed.
+	var cliBoundary boundaryDeclaration
+	for _, boundary := range importBoundaries {
+		if boundary.name == "cli" {
+			cliBoundary = boundary
+		}
+	}
+	if cliBoundary.name == "" {
+		t.Fatal("the cli boundary is not declared")
+	}
 	policy := closurePolicy{
-		allowlist:        cliStdlibAllowlist,
-		networkPackages:  []string{"internal/platform"},
-		networkAdditions: readOnlyPlatformNetworkAdditions,
+		allowlist:        cliBoundary.allowlist,
+		networkPackages:  cliBoundary.networkDirs,
+		networkAdditions: cliBoundary.networkAdditions,
 	}
 	granted := stdlibAllowlistFor(policy, "internal/platform")
 	if !slices.Contains(granted, "net") || !slices.Contains(granted, "net/http") {
@@ -383,6 +395,40 @@ func TestCLINetworkGrantIsScoped(t *testing.T) {
 		got := stdlibAllowlistFor(policy, other)
 		if slices.Contains(got, "net") || slices.Contains(got, "net/http") {
 			t.Errorf("%s must not be granted net or net/http, got %v", other, got)
+		}
+	}
+	// Enumerate every local package of the CLI closure instead of trusting the
+	// three names above: a new local package reached from cmd/ariadne must keep
+	// the base list too. The enumeration is proven non-empty so the invariant
+	// cannot pass vacuously.
+	const modulePrefix = "github.com/d4rpell/Ariadne/"
+	seenPlatform, seenOther := false, 0
+	seen := map[string]bool{}
+	for _, dep := range goListLines(t, "-deps", "-f", "{{.ImportPath}}", "../../cmd/ariadne") {
+		if !strings.HasPrefix(dep, modulePrefix) {
+			continue
+		}
+		relDir := strings.TrimPrefix(dep, modulePrefix)
+		seen[relDir] = true
+		if relDir == "internal/platform" {
+			seenPlatform = true
+			continue
+		}
+		seenOther++
+		got := stdlibAllowlistFor(policy, relDir)
+		if slices.Contains(got, "net") || slices.Contains(got, "net/http") {
+			t.Errorf("local package %s of the CLI closure is granted net or net/http: %v", relDir, got)
+		}
+	}
+	if !seenPlatform || seenOther == 0 {
+		t.Fatalf("CLI closure enumeration is vacuous: platform=%v other=%d", seenPlatform, seenOther)
+	}
+	// Non-omission control: packages reached only through the subcommands (not
+	// through a short prefix) must appear in the walk, so a filter regression
+	// cannot silently shrink the enumerated set.
+	for _, want := range []string{"internal/casefile", "internal/evaluator", "internal/bundle"} {
+		if !seen[want] {
+			t.Errorf("CLI closure enumeration omitted %s", want)
 		}
 	}
 }

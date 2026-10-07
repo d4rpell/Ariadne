@@ -273,16 +273,20 @@ func TestAppendDoesNotAliasInputsOrOutputs(t *testing.T) {
 		t.Fatal("Records returned live interior storage")
 	}
 
+	// Encode must hand out bytes that alias no interior storage: mutating the
+	// returned buffer in place — and comparing a second call against it — cannot
+	// alter what the book encodes. A copy-and-mutate on a detached slice, as the
+	// previous fixture did, proved nothing.
 	data := mustEncode(t, book)
-	mutated := append([]byte{}, data...)
-	mutated[len(mutated)-2] = 'x'
-	if !bytes.Equal(mustEncode(t, book), data) {
+	original := append([]byte{}, data...)
+	data[0] = 'X'
+	data[len(data)-2] = 'x'
+	if !bytes.Equal(mustEncode(t, book), original) {
 		t.Fatal("Encode returned mutable shared storage")
 	}
-	if _, err := Verify(data); err != nil {
+	if _, err := Verify(original); err != nil {
 		t.Fatalf("original bytes stopped verifying: %v", err)
 	}
-	_ = mutated
 }
 
 func TestAppendFailureIsAtomicInMemory(t *testing.T) {
@@ -372,6 +376,31 @@ func TestRecordHashCoversEveryField(t *testing.T) {
 		records, _ := Records(book)
 		if records[0].Hash == baseHash {
 			t.Fatalf("mutation %s left the hash unchanged", name)
+		}
+	}
+	// The positive direction above proves every field is inside the preimage; the
+	// rejection direction proves the bytes are covered, not merely counted: for
+	// each field the canonical envelope is regenerated with the mutation but its
+	// own hash member is rewritten back to the base hash, so a verifier that
+	// accepted the altered bytes would admit a record whose hash lies about its
+	// content.
+	for name, mutate := range mutations {
+		input := validInput()
+		mutate(&input)
+		document := string(mustEncode(t, mustAppend(t, NewBook(), input)))
+		// Positive control: the mutated record with its own coherent hash must
+		// verify, so the hash_mismatch below is attributable to the altered
+		// bytes alone, not to some other inconsistency the mutation introduced.
+		if _, err := Verify([]byte(document)); err != nil {
+			t.Fatalf("mutation %s: coherent envelope rejected: %v", name, err)
+		}
+		hashStart := strings.LastIndex(document, `"hash":"`) + len(`"hash":"`)
+		if hashStart < len(`"hash":"`) {
+			t.Fatalf("mutation %s: hash member not found", name)
+		}
+		rewritten := document[:hashStart] + baseHash + document[hashStart+len(baseHash):]
+		if _, verr := Verify([]byte(rewritten)); !IsCode(verr, CodeHashMismatch) {
+			t.Fatalf("mutation %s: altered bytes with the base hash were not rejected: %v", name, verr)
 		}
 	}
 	// The supersedes reference lives only on a later record: its presence and

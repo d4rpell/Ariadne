@@ -306,10 +306,19 @@ func TestCasefileBudgetBoundaries(t *testing.T) {
 		if _, err := Verify([]byte(plain)); !IsCode(err, CodeInvalidDecision) {
 			t.Fatalf("exact-boundary plain token: %v", err)
 		}
+		// The escaped spelling must also reach the exact raw-token boundary:
+		// 49152 backslashes are 24576 two-byte escape pairs, so the token spans
+		// 49154 raw bytes including its quotes — the same MaxStringTokenBytes as
+		// the plain vector above, not the half-width 24578 the previous fixture
+		// measured.
+		escapedToken := `"` + strings.Repeat(`\`, 49152) + `"`
+		if len(escapedToken) != MaxStringTokenBytes {
+			t.Fatalf("escaped boundary fixture is not width-exact: %d", len(escapedToken))
+		}
 		escaped := strings.Replace(
 			string(mustEncode(t, mustAppend(t, NewBook(), validInput()))),
 			`"risk_decision":"accepted"`,
-			`"risk_decision":"`+strings.Repeat(`\`, 24576)+`"`, 1)
+			`"risk_decision":`+escapedToken, 1)
 		if _, err := Verify([]byte(escaped)); !IsCode(err, CodeInvalidDecision) {
 			t.Fatalf("exact-boundary escaped token: %v", err)
 		}
@@ -352,12 +361,27 @@ func TestCasefileBudgetBoundaries(t *testing.T) {
 			`"risk_decision":"`+strings.Repeat("a", 49152)+`"`, 1)
 		document = strings.Replace(document, `"decided_at":"2026-10-04T12:00:00Z"`,
 			`"decided_at":"`+strings.Repeat("2", 49152)+`"`, 1)
+		// One extra byte before expires_at flips the raw-offset parity so an
+		// escape pair starts exactly at MaxRecordBytes-1: the run length below is
+		// then odd and the crossing is caught by the mid-pair re-check, not by the
+		// top-of-loop header guard. Without the parity flip an even run places its
+		// last complete pair at the boundary and the header guard masks the
+		// orthogonal §5.4 midpoint check.
+		document = strings.Replace(document, `CHG-0001"`, `CHG-00011"`, 1)
 		valueStart := strings.Index(document, `"expires_at":"`) + len(`"expires_at":"`)
 		backslashes := MaxRecordBytes - (valueStart - strings.Index(document, `{"format":"`+RecordFormat))
 		if backslashes <= 0 || backslashes > 49153 {
 			t.Fatalf("fixture cannot place the escape pair: %d", backslashes)
 		}
-		giant := document[:valueStart] + strings.Repeat(`\`, backslashes)
+		if backslashes%2 == 0 {
+			t.Fatalf("fixture does not place a pair start on the boundary: %d backslashes", backslashes)
+		}
+		// The byte after the boundary backslash is an invalid escape ("q"), so
+		// the two guards diverge: with the mid-pair re-check the crossing is a
+		// record_limit before the second byte is ever read; without it the parser
+		// would consume the pair and surface invalid_encoding. The assertion
+		// therefore pins the mid-pair guard, not only the fixture geometry.
+		giant := document[:valueStart] + strings.Repeat(`\`, backslashes) + "q"
 		if _, err := Verify([]byte(giant)); !IsCode(err, CodeRecordLimit) {
 			t.Fatalf("midpoint escape crossing: %v", err)
 		}

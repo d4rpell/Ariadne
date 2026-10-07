@@ -176,6 +176,47 @@ func TestPrismaRegistryLimitationsWithoutLosses(t *testing.T) {
 	}
 }
 
+// TestPrismaRegistryDerivedRecordBudget pins the derived record budget (§11.9.1)
+// through the registry profile: a record whose complete envelope exceeds the
+// derived limit fails production with output_limit/projection, never as a schema
+// rejection, exactly as the deployed family does. The oversized DTO is spliced
+// onto a real registry source so the profile, formats and limitations are the
+// registry ones.
+func TestPrismaRegistryDerivedRecordBudget(t *testing.T) {
+	src := registrySourceOf(t)
+	// Positive control: a normal registry source is within the derived budgets
+	// and encodes, so the output_limit below is attributable to the oversized
+	// record and not to the registry profile being refused outright.
+	if !ingest.NativeDerivedSizesWithinBudgets(src) {
+		t.Fatalf("normal registry source reported over budget")
+	}
+	if _, err := EncodePrismaNativeImport(src); err != nil {
+		t.Fatalf("normal registry source rejected: %v", err)
+	}
+	vulns := ingest.NativeArray{}
+	for i := 0; i < 3300; i++ {
+		vulns.Items = append(vulns.Items, ingest.NativeObject{
+			Keys: []string{"cve", "packageName", "vecStr"},
+			Values: []ingest.NativeValue{
+				ingest.NativeString("CVE-2026-1"),
+				ingest.NativeString(strings.Repeat("a", 1024)),
+				ingest.NativeString(strings.Repeat("b", 4096)),
+			},
+		})
+	}
+	src.Records[0].Data = ingest.NativeObject{
+		Keys:   []string{"packages", "type", "vulnerabilities"},
+		Values: []ingest.NativeValue{ingest.NativeArray{}, ingest.NativeString("image"), vulns},
+	}
+	if ingest.NativeDerivedSizesWithinBudgets(src) {
+		t.Fatalf("oversized registry record reported within budgets")
+	}
+	if _, err := EncodePrismaNativeImport(src); err == nil || err.Code != ingest.NativeCodeOutputLimit ||
+		err.Phase != ingest.NativePhaseProjection {
+		t.Fatalf("err = %+v, want output_limit/projection", err)
+	}
+}
+
 // TestPrismaRegistryReplayEquivalence checks the 2.0 artifacts replay under the
 // explicit registry selector/version.
 func TestPrismaRegistryReplayEquivalence(t *testing.T) {
