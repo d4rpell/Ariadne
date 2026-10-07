@@ -37,19 +37,27 @@ func run(argv []string, stdout, stderr io.Writer) int {
 		writeDiagnostic(stderr, failure)
 		return failure.exit
 	}
-	if failure := execute(call, stdout, cwd); failure != nil {
+	if failure := execute(call, argv, stdout, cwd); failure != nil {
 		writeDiagnostic(stderr, failure)
 		return failure.exit
 	}
 	return 0
 }
 
-func execute(call invocation, stdout io.Writer, cwd string) *cliError {
+func execute(call invocation, argv []string, stdout io.Writer, cwd string) *cliError {
 	// The read-only platform server is its own surface (ADR-0034, task A3-06):
 	// it reads one casefile book instead of a bundle, context and pack, so it
 	// branches before the evaluation order.
 	if call.command == commandServe {
 		return runServe(call, stdout, cwd)
+	}
+	// The CSV-to-case import pipeline (ADR-0036, task A3-09) reads findings,
+	// bindings and a declared instant instead of a bundle, context and pack,
+	// and writes the bundle artifacts instead of evaluating. It branches
+	// before the evaluation order too, and needs argv because the declared run
+	// metadata copies it exactly.
+	if call.command == commandImport {
+		return runImport(call, argv, stdout, cwd)
 	}
 	// Phase 1-2: every read precedes every decode, in the ratified order.
 	bundleBytes, failure := readInput(call.value("bundle"), stageBundleRead, maxBundleInputBytes, true, cwd)

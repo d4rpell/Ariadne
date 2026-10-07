@@ -7,23 +7,25 @@ import (
 	"github.com/d4rpell/Ariadne/internal/casefile"
 )
 
-// Command names of the ratified surface (ADR-0023 §4.1) plus the read-only
-// platform server (ADR-0034, task A3-06). The deferred ones are known and
-// rejected with their own code: they are not aliases and they must not appear to
-// work.
+// Command names of the ratified surface (ADR-0023 §4.1), the read-only
+// platform server (ADR-0034, task A3-06) and the CSV-to-case import pipeline
+// (ADR-0036, task A3-09). The deferred ones are known and rejected with their
+// own code: they are not aliases and they must not appear to work.
 const (
 	commandEvaluate = "evaluate"
 	commandReport   = "report"
 	commandVerify   = "verify"
 	commandServe    = "serve"
+	commandImport   = "import"
 )
 
-var deferredCommands = []string{"import", "normalize", "diff"}
+var deferredCommands = []string{"normalize", "diff"}
 
-// helpLines are the exact ratified texts of ADR-0023 §4.1. They are constants of
-// this package, not data from any file, and the tests freeze them byte a byte.
+// helpLines are the exact ratified texts of ADR-0023 §4.1 as extended by
+// ADR-0036. They are constants of this package, not data from any file, and
+// the tests freeze them byte a byte.
 const (
-	helpRoot = "Usage: ariadne <evaluate|report|verify|serve> [flags]\n" +
+	helpRoot = "Usage: ariadne <evaluate|report|verify|import|serve> [flags]\n" +
 		"Use ariadne <command> --help for required flags.\n" +
 		"Pre-alpha. Offline. Report distribution is not authorized.\n"
 	helpLastLine = "Pre-alpha. Offline. Report distribution is not authorized.\n"
@@ -39,6 +41,7 @@ var (
 	flagsReport   = flagSet{"bundle", "bundle-hash", "pack", "context", "format", "out"}
 	flagsVerify   = flagSet{"bundle", "bundle-hash", "pack", "context", "result-fingerprint"}
 	flagsServe    = flagSet{"casebook", "as-of", "port"}
+	flagsImport   = flagSet{"findings", "bindings", "observed-at", "out-envelope", "out-projection", "out-digest"}
 )
 
 // invocation is one parsed command with its flags resolved. Values are literals
@@ -75,6 +78,8 @@ func parseArguments(argv []string) (invocation, *cliError) {
 		return parseCommand(commandVerify, flagsVerify, argv[1:])
 	case commandServe:
 		return parseCommand(commandServe, flagsServe, argv[1:])
+	case commandImport:
+		return parseCommand(commandImport, flagsImport, argv[1:])
 	}
 	for _, deferred := range deferredCommands {
 		if name == deferred {
@@ -131,7 +136,9 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 	// The closed vocabularies of the interface are argument grammar: a hash that
 	// is not `sha256:` plus 64 lowercase hex and a format outside json|html are
 	// the same rejection as an unknown flag, decided before any file is read.
-	if command != commandServe {
+	// The import command carries no bundle hash: its instant is its grammar
+	// check, decided with the same rule as the server's as-of.
+	if command != commandServe && command != commandImport {
 		if !isSha256Text(values["bundle-hash"]) {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
@@ -155,6 +162,14 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
 		if _, err := casefile.Assess(casefile.NewBook(), values["as-of"]); err != nil {
+			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
+		}
+	}
+	if command == commandImport {
+		// The observation instant is argument grammar (ADR-0036): a non-canonical
+		// spelling is rejected before any file is read, and the same canonical
+		// value is rebuilt once here so the pipeline never re-parses it.
+		if _, ok := canonicalTimestamp(values["observed-at"]); !ok {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
 	}
@@ -202,6 +217,8 @@ func (call invocation) helpText() string {
 		return "Usage: ariadne verify --bundle PATH --bundle-hash H --pack PATH --context PATH --result-fingerprint H\n" + helpLastLine
 	case call.command == commandServe:
 		return "Usage: ariadne serve --casebook PATH --as-of TIMESTAMP --port N\n" + helpLastLine
+	case call.command == commandImport:
+		return "Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH\n" + helpLastLine
 	}
 	return ""
 }

@@ -9,18 +9,23 @@ import (
 // sets: the executor does not extend them, and a code the table does not know
 // fails closed as internal_failure instead of inventing a stage.
 const (
-	stageArguments     = "arguments"
-	stageBundleRead    = "bundle_read"
-	stageContextRead   = "context_read"
-	stagePackRead      = "pack_read"
-	stageBundleDecode  = "bundle_decode"
-	stageContextDecode = "context_decode"
-	stageEvaluate      = "evaluate"
-	stageReport        = "report"
-	stageVerify        = "verify"
-	stageOutputWrite   = "output_write"
-	stageStdoutWrite   = "stdout_write"
-	stageInternal      = "internal"
+	stageArguments      = "arguments"
+	stageBundleRead     = "bundle_read"
+	stageContextRead    = "context_read"
+	stagePackRead       = "pack_read"
+	stageFindingsRead   = "findings_read"
+	stageBindingsRead   = "bindings_read"
+	stageBundleDecode   = "bundle_decode"
+	stageContextDecode  = "context_decode"
+	stageFindingsDecode = "findings_decode"
+	stageBindingsDecode = "bindings_decode"
+	stageImport         = "import"
+	stageEvaluate       = "evaluate"
+	stageReport         = "report"
+	stageVerify         = "verify"
+	stageOutputWrite    = "output_write"
+	stageStdoutWrite    = "stdout_write"
+	stageInternal       = "internal"
 )
 
 const (
@@ -37,6 +42,8 @@ const (
 	codeInputLimit                = "input_limit"
 	codeInvalidBundle             = "invalid_bundle"
 	codeInvalidContext            = "invalid_context"
+	codeInvalidFindings           = "invalid_findings"
+	codeInvalidBindings           = "invalid_bindings"
 	codeResultFingerprintMismatch = "result_fingerprint_mismatch"
 	codeInternalFailure           = "internal_failure"
 )
@@ -62,9 +69,14 @@ var exitRows = []struct {
 	{stageArguments, []string{codeInvalidArguments, codeUnknownCommand, codeCommandDeferred}, 2},
 	{stageBundleDecode, []string{codeInvalidBundle}, 3},
 	{stageContextDecode, []string{codeInvalidContext}, 3},
+	{stageFindingsDecode, []string{codeInvalidFindings}, 3},
+	{stageBindingsDecode, []string{codeInvalidBindings}, 3},
+	{stageImport, []string{codeInvalidBindings}, 3},
 	{stageBundleRead, []string{codeInputLimit}, 3},
 	{stageContextRead, []string{codeInputLimit}, 3},
 	{stagePackRead, []string{codeInputLimit}, 3},
+	{stageFindingsRead, []string{codeInputLimit}, 3},
+	{stageBindingsRead, []string{codeInputLimit}, 3},
 	{stageBundleDecode, []string{codeInputLimit}, 3},
 	{stageEvaluate, []string{
 		codeInputLimit, "invalid_target", "invalid_bundle", codeInvalidContext,
@@ -75,6 +87,8 @@ var exitRows = []struct {
 	{stageBundleRead, []string{codeNotFound, codePermissionDenied, codeInvalidFile, codeReadFailure, codeTimeout}, 4},
 	{stageContextRead, []string{codeNotFound, codePermissionDenied, codeInvalidFile, codeReadFailure, codeTimeout}, 4},
 	{stagePackRead, []string{codeNotFound, codePermissionDenied, codeInvalidFile, codeReadFailure, codeTimeout}, 4},
+	{stageFindingsRead, []string{codeNotFound, codePermissionDenied, codeInvalidFile, codeReadFailure, codeTimeout}, 4},
+	{stageBindingsRead, []string{codeNotFound, codePermissionDenied, codeInvalidFile, codeReadFailure, codeTimeout}, 4},
 	{stageOutputWrite, []string{codeAlreadyExists, codePermissionDenied, codeInvalidFile, codeWriteFailure, codeTimeout}, 4},
 	{stageStdoutWrite, []string{codeWriteFailure, codeTimeout}, 4},
 	{stageEvaluate, []string{"bundle_hash_mismatch"}, 5},
