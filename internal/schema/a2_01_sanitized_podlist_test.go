@@ -176,7 +176,7 @@ func TestA201SchemaOwnership(t *testing.T) {
 			t.Fatalf("%s() returned an already injected slice", fieldFunction.name)
 		}
 		first[0] = "injected"
-		first = append(first, "injected")
+		_ = append(first, "injected")
 		if !a201SameFieldSet(second, fieldFunction.want) {
 			t.Fatalf("two %s() calls share mutable state: second = %v, want %v", fieldFunction.name, second, fieldFunction.want)
 		}

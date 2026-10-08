@@ -251,8 +251,8 @@ func TestA108PresentationLayers(t *testing.T) {
 			t.Fatal("the img tag of the injected value must be escaped in HTML")
 		}
 		// The formula prefix stays inert text in both formats.
-		if !strings.Contains(string(document), `=SUM(1)`) && !strings.Contains(string(document), `=SUM(1)`) {
-			t.Fatal("the formula prefix must stay in the JSON document as inert text")
+		if !strings.Contains(string(document), `=SUM(1)`) || !strings.Contains(string(page), `=SUM(1)`) {
+			t.Fatal("the formula prefix must stay in both reports as inert text")
 		}
 	})
 }
