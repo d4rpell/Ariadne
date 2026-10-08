@@ -1,0 +1,56 @@
+# AX-07 static-analysis gate. CI runs `make lint` (.github/workflows/ci.yml).
+#
+# Correctness + security only, and never silently truncated: issue caps are
+# disabled so a re-run of the same finding is not hidden. Style-suggestion
+# linters (ST*/QF*/S1*) and dead-code detection are out of scope here.
+
+version: "2"
+
+run:
+  timeout: 5m
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - gosec
+  settings:
+    # check-blank reports `_ = f()` discards too, so a discarded error cannot
+    # come back through the blank identifier. Closing a read-path handle is the
+    # canonical best-effort case, excluded explicitly; every other discard is
+    # reported (or suppressed on the exact line with a reason).
+    errcheck:
+      check-blank: true
+      exclude-functions:
+        - (io.Closer).Close
+    # Only the SA* class of staticcheck: real bugs (impossible conditions,
+    # unreachable/empty branches, nil derefs). ST*/QF*/S1* are style.
+    staticcheck:
+      checks:
+        - "SA*"
+
+  exclusions:
+    rules:
+      # Test files: gosec and errcheck report test idioms (0644 fixture files,
+      # exec.Command of the go toolchain, unchecked Close/Fprintf on fixtures).
+      # These never run in production.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+      # G115 flags every int<->uint conversion. It is excluded only inside the
+      # hostile-input parsers, where the conversions operate on offsets and
+      # sizes already bounded by the ratified budgets (the budget tests pin the
+      # L/L+1 boundaries). Anywhere else G115 still fires, so a future unbounded
+      # conversion outside these packages is not silently exempt.
+      - path: internal/(ingest|collector|prismaacquire|normalize)/.+\.go
+        linters:
+          - gosec
+        text: G115

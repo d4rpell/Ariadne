@@ -27,8 +27,17 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      # make check runs: gofmt, vet, build, test, golden vectors, race, import boundary.
-      # Absent on purpose: lint and gosec (AX-07), evaluator determinism (A1-04),
-      # arm64 golden outputs (A2-05).
+      # make check runs: gofmt, vet, build, test, golden vectors, race, import
+      # boundary, lint (golangci-lint). Absent on purpose: evaluator determinism
+      # (A1-04), arm64 golden outputs (A2-05).
+      - name: Install golangci-lint
+        # Installed (not run) here so `make check` stays the single gate entry,
+        # identical to the local run. The installer script and the version are
+        # both pinned to the immutable tag v2.14.0; `make lint` refuses any other
+        # installed version, so a drift fails instead of passing silently.
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.14.0/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.14.0
+
       - name: Gates
         run: make check
