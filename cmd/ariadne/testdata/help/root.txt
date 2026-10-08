@@ -1,3 +1,3 @@
 Usage: ariadne <book|append|diff|evaluate|report|verify|import|serve> [flags]
 Use ariadne <command> --help for required flags.
-Pre-alpha. Offline. Report distribution is not authorized.
+MVP complete. Offline.

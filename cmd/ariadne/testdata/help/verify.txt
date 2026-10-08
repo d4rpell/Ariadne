@@ -1,2 +1,2 @@
 Usage: ariadne verify --bundle PATH --bundle-hash H --pack PATH --context PATH --result-fingerprint H
-Pre-alpha. Offline. Report distribution is not authorized.
+MVP complete. Offline.

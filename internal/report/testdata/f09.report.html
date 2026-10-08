@@ -8,13 +8,13 @@ body{font-family:system-ui,sans-serif;line-height:1.45;margin:2rem;max-width:80r
 h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.8rem}h3{font-size:1rem;margin-top:1.2rem}
 table{border-collapse:collapse;margin:0.6rem 0}th,td{border:1px solid #999;padding:0.25rem 0.5rem;text-align:left;vertical-align:top}
 code{font-family:ui-monospace,monospace}
-.pre-alpha{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
+.notice{border:1px solid #999;padding:0.6rem;background:#f4f4f4}
 .limits li{margin:0.2rem 0}
 </style>
 </head>
 <body>
 <h1>Ariadne evaluation report</h1>
-<p class="pre-alpha">Pre-alpha presentation of one evaluation result. It is not a risk acceptance, not an approval and not a security statement. This document reproduces what the evaluator computed; it adds no conclusion.</p>
+<p class="notice">MVP complete presentation of one evaluation result. It is not a risk acceptance, not an approval and not a security statement. This document reproduces what the evaluator computed; it adds no conclusion.</p>
 
 <h2>Evaluation identity</h2>
 <table>
@@ -128,7 +128,7 @@ code{font-family:ui-monospace,monospace}
 <ul class="limits">
 <li>The bundle hash proves integrity of those bytes. It does not authenticate the origin or the cluster, and it does not prove that the sources are sufficient, exhaustive or current.</li>
 <li>This presentation is not a second evaluator. Re-evaluating the semantics of a fabricated result is out of scope, so form validation does not establish that the evaluation was sound.</li>
-<li>There is no universal secret detector. Identifiers and citations are included under the responsibility of the producer and the caller who holds the case, and distribution of reports is not authorized by this contract.</li>
+<li>There is no universal secret detector. Identifiers and citations are included under the responsibility of the producer and the caller who holds the case.</li>
 <li>Nothing here is safe, approved, risk-free or valid by implication, and no spreadsheet-import protection is claimed.</li>
 </ul>
 </body>

@@ -122,31 +122,31 @@ func TestArgumentsHelpExact(t *testing.T) {
 		{[]string{"--help"},
 			"Usage: ariadne <book|append|diff|evaluate|report|verify|import|serve> [flags]\n" +
 				"Use ariadne <command> --help for required flags.\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"evaluate", "--help"},
 			"Usage: ariadne evaluate --bundle PATH --bundle-hash H --pack PATH --context PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"report", "--help"},
 			"Usage: ariadne report --bundle PATH --bundle-hash H --pack PATH --context PATH --format json|html --out PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"verify", "--help"},
 			"Usage: ariadne verify --bundle PATH --bundle-hash H --pack PATH --context PATH --result-fingerprint H\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"serve", "--help"},
 			"Usage: ariadne serve --casebook PATH --as-of TIMESTAMP --port N\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"import", "--help"},
 			"Usage: ariadne import --findings PATH --bindings PATH --observed-at TIMESTAMP --out-envelope PATH --out-projection PATH --out-digest PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"book", "--help"},
 			"Usage: ariadne book --out PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"append", "--help"},
 			"Usage: ariadne append --casebook PATH --decision accepted|deferred|rejected --owner TEXT --approver TEXT --rationale TEXT --bundle-hash H --subject-uid TEXT --container-name TEXT --container-class regular|init|ephemeral --vulnerability-id TEXT --decided-at TIMESTAMP [--expires-at TIMESTAMP] [--supersedes H] [--result-fingerprint H] [--controls LIST] --out PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 		{[]string{"diff", "--help"},
 			"Usage: ariadne diff --casebook PATH --since TIMESTAMP --as-of TIMESTAMP --out PATH\n" +
-				"Pre-alpha. Offline. Report distribution is not authorized.\n"},
+				"MVP complete. Offline.\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(strings.Join(testCase.argv, " "), func(t *testing.T) {
