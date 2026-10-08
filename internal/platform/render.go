@@ -5,7 +5,7 @@ import (
 	"html/template"
 )
 
-// banner is the fixed, visible limits notice of the pre-alpha platform. It is a
+// banner is the fixed, visible limits notice of the read-only platform. It is a
 // constant of this package, never data from any file.
 const banner = "read-only projection of one human decision record; not a risk acceptance, not an approval, not a security statement; not a source of truth"
 
@@ -211,7 +211,7 @@ h1 { margin: 0 0 16px; font-size: 1.75rem; }
 h2 { margin: 0 0 12px; font-size: 1.125rem; }
 p { margin: 0 0 16px; }
 section { margin-top: 28px; }
-.pre-alpha {
+.notice {
 	padding: 12px 16px;
 	border-left: 4px solid #4b5563;
 	background: #edf0f3;
@@ -319,7 +319,7 @@ const dashboardTemplate = `<!doctype html>
 <main>
 <header>
 <h1>Ariadne governance dashboard</h1>
-<p class="pre-alpha">{{.Banner}}</p>
+<p class="notice">{{.Banner}}</p>
 </header>
 <section aria-labelledby="book-heading">
 <h2 id="book-heading">Book observation</h2>
@@ -417,7 +417,7 @@ const decisionTemplate = `<!doctype html>
 <header>
 <nav aria-label="Breadcrumb"><p class="breadcrumb"><a href="/">Dashboard</a> / Decision #{{.Sequence}}</p></nav>
 <h1>Decision record #{{.Sequence}}</h1>
-<p class="pre-alpha">{{.Banner}}</p>
+<p class="notice">{{.Banner}}</p>
 </header>
 <section aria-labelledby="declaration-heading">
 <h2 id="declaration-heading">Declaration</h2>

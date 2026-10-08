@@ -11,5 +11,4 @@
 // CSAF action statement, because Ariadne models no remediation). These documents
 // are not the evidence bundle, not a decision record and not a risk acceptance,
 // and none of them proves the correctness of the conclusion it presents.
-// Distribution of the exported documents is not authorized by this contract.
 package interop

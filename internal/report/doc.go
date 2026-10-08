@@ -8,6 +8,5 @@
 // The report is not the evidence bundle, not a decision record and not a risk
 // acceptance. Values and free-text warning messages are excluded by
 // presentation policy; authorization of the identifiers and citations it does
-// carry belongs to the producer and the caller, and distribution of reports is
-// not authorized by this contract.
+// carry belongs to the producer and the caller (ADR-0039).
 package report

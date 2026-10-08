@@ -26,13 +26,13 @@ const (
 var deferredCommands = []string{"normalize"}
 
 // helpLines are the exact ratified texts of ADR-0023 §4.1 as extended by
-// ADR-0036, ADR-0037 and ADR-0038. They are constants of this package, not data
-// from any file, and the tests freeze them byte a byte.
+// ADR-0036, ADR-0037, ADR-0038 and ADR-0039. They are constants of this
+// package, not data from any file, and the tests freeze them byte a byte.
 const (
 	helpRoot = "Usage: ariadne <book|append|diff|evaluate|report|verify|import|serve> [flags]\n" +
 		"Use ariadne <command> --help for required flags.\n" +
-		"Pre-alpha. Offline. Report distribution is not authorized.\n"
-	helpLastLine = "Pre-alpha. Offline. Report distribution is not authorized.\n"
+		"MVP complete. Offline.\n"
+	helpLastLine = "MVP complete. Offline.\n"
 )
 
 // flagSet is the complete and only admitted flag set of one command, in the
