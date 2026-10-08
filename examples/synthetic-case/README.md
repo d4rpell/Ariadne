@@ -48,4 +48,4 @@ under `fixtures/<name>/0.2/`; this directory does not duplicate them.
 - These files demonstrate the CLI over synthetic data; they do not demonstrate
   support for any real scanner export, vendor advisory or customer
   environment.
-- Report and bundle distribution is not authorized in pre-alpha.
+- The tool is a completed, offline, pre-release MVP; no release or external distribution is provided.

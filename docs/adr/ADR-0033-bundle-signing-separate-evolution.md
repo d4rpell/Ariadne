@@ -2,6 +2,8 @@
 
 **Status: Ratified on 2026-10-06 by the owner** (proposed 2026-10-05). Independently reviewed (`apto`, 0 P0/0 P1) and published on 2026-10-05; owner ratification granted on 2026-10-06 and recorded locally (no further commit/push). Task A3-05. **No implementation is part of this decision**: it adds no wire fields, states, CLI commands or dependencies; any future implementation requires a new ADR with its own authorization.
 
+> **Distribution clause superseded (2026-10-08):** the statement that distribution of the reports, bundles or exported documents is “not authorized” was withdrawn from the product presentation and from the current-state documentation by [ADR-0039](ADR-0039-state-label-and-distribution-scope.md). The rationale and dated text below are retained as history; the security and accuracy limits of this record still stand.
+
 ## Proposed decision
 
 1. Bundle signing is treated as a **separate evolution**, outside the MVP and outside the phases ratified so far. It is not implemented in this task.

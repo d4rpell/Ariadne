@@ -1,6 +1,9 @@
 # ADR-0027: Native ingestion of Prisma deployed-image reports (offline)
 
 - **Status:** ratified by the owner (2026-10-02); independently reviewed with no open finding; implementation complete and independently reviewed (`apto`, 0 P0/P1/P2/P3), published 2026-10-03.
+
+> **Distribution clause superseded (2026-10-08):** the statement that distribution of the reports, bundles or exported documents is “not authorized” was withdrawn from the product presentation and from the current-state documentation by [ADR-0039](ADR-0039-state-label-and-distribution-scope.md). The rationale and dated text below are retained as history; the security and accuracy limits of this record still stand.
+
 - **Origin:** task A2-07-F1; the underlying contract was independently reviewed and closed with no open finding.
 - **Relationships:** develops the offline scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) (see its proposed-revision section). Preserves the evidence bundle wire `0.2`, the `prisma-v1` input contract, and the accepted records on identity, provenance, decision layers and the evaluator boundary. Supersedes no accepted record.
 

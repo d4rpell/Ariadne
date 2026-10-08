@@ -1,6 +1,9 @@
 # ADR-0028: Optional Prisma API acquisition connector
 
 - **Status:** ratified by the owner (2026-10-02, decisions NE-N01..N07); implemented (task A2-08-F2), independently reviewed with **`apto` (0 P0/P1/P2/P3)** and published (2026-10-03); accepted by the owner (2026-10-03). Real-service compatibility remains **not verified**.
+
+> **Distribution clause superseded (2026-10-08):** the statement that distribution of the reports, bundles or exported documents is “not authorized” was withdrawn from the product presentation and from the current-state documentation by [ADR-0039](ADR-0039-state-label-and-distribution-scope.md). The rationale and dated text below are retained as history; the security and accuracy limits of this record still stand.
+
 - **Origin:** task A2-07-F2; the contract builds on the ratified offline ingestion scope of [ADR-0027](ADR-0027-native-prisma-report-ingestion.md).
 - **Relationships:** develops the network scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) (see its connector precision section). Follows the read-only network precedent of [ADR-0026](ADR-0026-optional-pod-collector.md) as a separate privilege root. Does not change the evidence bundle wire `0.2`, the `prisma-v1` input contract, the decision layers or the Kubernetes collector.
 

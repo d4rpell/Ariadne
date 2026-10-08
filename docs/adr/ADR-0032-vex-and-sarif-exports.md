@@ -1,6 +1,8 @@
 # ADR-0032: OpenVEX and SARIF exports where the semantics fit
 
 - **Status:** ratified by the owner and accepted (2026-10-05). Implemented as `internal/interop` and independently reviewed the same day (contract, handoff and delta each closed with no open P0/P1). Contract and implementation files are published as of 2026-10-05 with owner authorization.
+
+> **Distribution clause superseded (2026-10-08):** the statement that distribution of the reports, bundles or exported documents is “not authorized” was withdrawn from the product presentation and from the current-state documentation by [ADR-0039](ADR-0039-state-label-and-distribution-scope.md). The rationale and dated text below are retained as history; the security and accuracy limits of this record still stand.
 - **Scope:** task A3-03; new package `internal/interop` (twelfth root of the import gate).
 - **Relationships:** applies [ADR-0004](ADR-0004-no-exec-human-decision.md) (no hidden clock), [ADR-0011](ADR-0011-decision-record-policy.md) (two-layer record policy) and the deterministic-presentation model of [ADR-0022](ADR-0022-json-and-html-report-contract.md), including its **no-authorized-distribution** rule. Reuses the rigor of evidence-bundle wire `0.2` without changing it. Coexists with [ADR-0017](ADR-0017-optional-governance-platform-and-timeline.md) and the still-open export question of [ADR-0019](ADR-0019-operating-modes-and-persistent-tracking.md). Supersedes no accepted record.
 

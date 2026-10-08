@@ -18,7 +18,8 @@ its own. The GIFs are offered as links for readers who choose to open them.
 ## Text transcription — flow (`ariadne-flow.gif` / `.png`)
 
 One walkthrough, one subject. Every value below is real output of the built
-binary over the synthetic fixtures named in the manifest.
+binary over the synthetic fixtures named in the manifest. The footer of every
+frame reads "Ariadne | MVP complete | offline | synthetic data".
 
 1. **Title.** "Ariadne — finding → evidence → decision" / "offline, synthetic
    fixtures, human risk decision".
@@ -33,7 +34,8 @@ binary over the synthetic fixtures named in the manifest.
    `not_affected`.
 5. **`report`.** Deterministic JSON/HTML presentation; `risk_decision: null`
    (the human layer is recorded separately), `exploitability: not_assessed`.
-   Report and bundle distribution is not authorized in pre-alpha.
+   The report states it "renders the computed result; adds no conclusion", and
+   the tool is a completed, offline, pre-release MVP.
 6. **`book` + `append`.** An append-only human decision record is started and
    one decision is declared: `accepted`, `records = 1`,
    `head_hash = sha256:75c1ca1f00…8a0ddc`.
@@ -49,7 +51,7 @@ binary over the synthetic fixtures named in the manifest.
 read-only loopback dashboard. No value below is invented; it is the rendered
 page.
 
-1. **Dashboard header.** "Ariadne governance dashboard" with the pre-alpha
+1. **Dashboard header.** "Ariadne governance dashboard" with the limits
    banner: "read-only projection of one human decision record; not a risk
    acceptance, not an approval, not a security statement; not a source of
    truth."
@@ -151,7 +153,7 @@ windows/amd64.
 
 ## Determinism manifest
 
-Recorded environment (2026-10-08), code revision `350f49aa193545b92baac5c3e29e45a15ba8c56f`:
+Recorded environment (2026-10-08), base code revision `350f49aa193545b92baac5c3e29e45a15ba8c56f`. The **flow** GIF/PNG were regenerated for [ADR-0039](../adr/ADR-0039-state-label-and-distribution-scope.md) (state label and withdrawal of the distribution clause); the CLI receipts are unchanged, so only the printed presentation text differs. The **dashboard** GIF/PNG are unchanged (they show neither the label nor the clause):
 
 | Component | Value |
 |---|---|
@@ -168,7 +170,7 @@ reconstructed):
 | Generator | SHA-256 |
 |---|---|
 | `run_chain.sh` (CLI chain) | `843168f1c4e544c376358c128b4e7cff8446e21dacfda6e7b9502dcb07cdee75` |
-| `gen_flow.py` (flow frames + GIF + sheet) | `7141cf1c366b9d3713a09c1ac6fd03f9c62e517443c1ccfb9c4a565298e7fa21` |
+| `gen_flow.py` (flow frames + GIF + sheet) | `4d3b5c6dcfd60cb3b7ab7a60d7edb86809c899bd2075de3b704469f3da146d9c` |
 | `gen_serve.py` (dashboard frames + GIF + sheet) | `4c912f69552eb1c03f3987dc00384cc88f7d9f1e00db98dc3c17f761c63c4fc9` |
 | `gen/sections.mjs` (captures) | `10dbc687ad5a410f1dd7dbf46198aeccf3ddf4ad1c83e7e7b2e80b9726f4125c` |
 | `gen/offsets.mjs` (section geometry) | `cdfa141676c9bb5f58d189b05f3c54f2a6abe7fab5f801d1602cd3ce4252c4bf` |
@@ -212,8 +214,8 @@ Published artifacts (SHA-256):
 
 | Artifact | Bytes | SHA-256 |
 |---|---|---|
-| `ariadne-flow.gif` | 65227 | `48f0978b1133eb6fd754329348fec7dff3d048390e7736f394e2b6269a1f30f2` |
-| `ariadne-flow.png` | 115719 | `9ca16e93872fa5c682f0045ddc2beede64a7750e1d506df084ab18274efc64a9` |
+| `ariadne-flow.gif` | 65929 | `affa0f642dd21feb58b01e4620c45d2b1e348ca6e4f63f2f1787ae9d6b5c8d20` |
+| `ariadne-flow.png` | 116856 | `a364e52df2f9256486b78c769cc8ec283770f1c06b198402411db7551d7e8f1b` |
 | `ariadne-serve.gif` | 130304 | `4e06f4a019e628fa21ecacd6222e9aaa57e95727770c7d7b3210812ceecda427` |
 | `ariadne-serve.png` | 187478 | `638c16ff2c9622b1e996ada7494f6fe71d043a073b43d17b1cf8888e04e534fe` |
 
@@ -231,4 +233,4 @@ identical receipts.
 - Byte-for-byte reproducibility of the images is guaranteed only in the recorded
   environment (windows/amd64); the recorded dashboard font is `system-ui, sans-serif`.
 - No external WCAG conformance is claimed.
-- Report and bundle distribution is not authorized in pre-alpha.
+- The tool is a completed, offline, pre-release MVP; no release or external distribution is provided.

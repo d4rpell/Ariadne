@@ -2,7 +2,7 @@
 
 > **Ariadne has been verified against exactly one environment: a single-node synthetic Kubernetes 1.37.0 lab. No OpenShift release — and no other Kubernetes distribution, version or managed cloud — has been verified. "Not verified" below means exactly that: it is neither a claim of compatibility nor a claim of incompatibility.**
 
-**Status:** PRE-ALPHA. This page reports first-party experimental evidence gathered with the real Ariadne collector binary against a real API server, with synthetic fixtures only (no customer or production data). Every claim below is scoped to that exercise; the [README](../README.md) states what Ariadne is and deliberately is not, and [ADR-0026](adr/ADR-0026-optional-pod-collector.md) defines the collector contract these results exercised.
+**Status:** MVP complete, offline. This page reports first-party experimental evidence gathered with the real Ariadne collector binary against a real API server, with synthetic fixtures only (no customer or production data). Every claim below is scoped to that exercise; the [README](../README.md) states what Ariadne is and deliberately is not, and [ADR-0026](adr/ADR-0026-optional-pod-collector.md) defines the collector contract these results exercised.
 
 ## How this was verified
 

@@ -4,9 +4,10 @@ Run the offline CLI over a synthetic evidence bundle: evaluate it, render a
 report, and replay the evaluation to verify the result fingerprint. Everything
 runs locally on repository data — no cluster, no scanner account, no network.
 
-**Status: PRE-ALPHA.** The CLI implements three commands over an existing
-canonical bundle: `evaluate`, `report` and `verify`. There is no `import`,
-`normalize` or `diff` yet, and no release. See [what this does not
+**Status: MVP complete, offline, pre-release.** The CLI implements the full
+offline surface: `import`, `evaluate`, `report`, `verify`, `book`, `append`,
+`serve` and `diff` over a canonical bundle or casefile book. `normalize` is the
+only deferred subcommand. There is no release. See [what this does not
 do](#what-this-does-not-do) before reading the outputs as product claims.
 
 ## Requirements
@@ -97,8 +98,7 @@ inferred), the rules that fired, and the evidence catalogue resolved from the
 bundle. The HTML report is the same content for humans. Both are deterministic:
 the same bundle, pack and context produce the same bytes.
 
-> Report distribution is not authorized in pre-alpha. These files are local
-> output, not deliverables to share.
+> These files are local output of a pre-release tool, not release artifacts.
 
 ## Step 3 — verify the replay
 
@@ -137,7 +137,7 @@ Two more fixtures ship with precomposed contexts and captured receipts in
 | `F10-redhat-backport` | Vendor proof, artifact inspection and mapping present | `fixed` |
 | `F13-contradictory-evidence` | Two affirmative rules with conflicting evidence | `under_investigation` (conflict is never resolved by rule order) |
 
-Run them with the same three commands, substituting the paths, the bundle hash
+Run them with the same commands, substituting the paths, the bundle hash
 from `fixtures/<name>/0.2/expected/bundle.sha256` and the context file. Compare
 your receipts with the published ones: `evaluate` must reproduce them byte for
 byte.
@@ -163,16 +163,18 @@ Run `./ariadne --help` for the exact usage; the help text is frozen by tests.
 
 ## What this does not do
 
-- **No `import`.** The CLI does not read scanner CSVs, `kubectl`/`oc` exports or
-  SBOMs yet. It consumes a canonical evidence bundle, which today is produced by
-  the library layer of this repository (parser, normalization, bundle build).
-  The deferred subcommands return `command_deferred`.
+- **No `normalize` subcommand.** `import` reads a `prisma-v1` CSV plus an
+explicit operator bindings document; the `normalize` step runs inside `import`
+and is not exposed as its own command (`command_deferred`). Observation sources
+(`kubectl`/`oc` exports, SBOMs, advisories) remain library-only.
 - **No cluster access.** Nothing here connects to Kubernetes or OpenShift.
-- **No exception decision.** `risk_decision` is always `null`; the exception
-  record does not exist yet.
+- **No exception decision inside the report.** `risk_decision` is always `null`
+  in a report: the human decision lives in a separate append-only casefile book
+  (`book`/`append`), never inferred from an evaluation result.
 - **No exploitability conclusion by default.** F09/F10/F13 keep
   `exploitability: not_assessed`.
-- **No report or bundle distribution, and no release.** Pre-alpha.
+- **No release.** The MVP is complete and offline, with no release, tag or
+external distribution.
 - **No authenticity from hashes.** A matching hash proves the bytes are the ones
   that were hashed, not who produced them.
 

@@ -16,7 +16,7 @@ Already available:
 - [`compatibility.md`](compatibility.md) — **what has actually been verified**: the collector exercised against a single-node synthetic Kubernetes 1.37.0 lab, with the full result matrix and its limits. **OpenShift is not verified**; no OpenShift compatibility is claimed.
 - [`comparison.md`](comparison.md) — a **documentation-based capability matrix** against Prisma Cloud Compute, Sysdig Secure/Falco, RHACS 4.8, Kubescape and VEX/CSAF tooling. For this matrix, no product compared was validated experimentally; every cell cites its official source and consultation date. Ariadne's own collector was separately exercised against a real synthetic Kubernetes lab — see [`compatibility.md`](compatibility.md).
 - [`adr/`](adr/README.md) — the **decision records**: what was decided, the alternatives considered, why the chosen option was the best available at the time, and the conditions that would justify revisiting it. This is the place to look when the question is “why does it work this way?” rather than “how do I run it?”.
-- [`spec/evidence-bundle/0.2.md`](spec/evidence-bundle/0.2.md) — the **wire specification of the evidence bundle** (`0.2`): canonical serialization, hash projection and a third-party verification procedure, with [published synthetic vectors](spec/evidence-bundle/0.2/). Pre-alpha: publication does not authorize distribution.
+- [`spec/evidence-bundle/0.2.md`](spec/evidence-bundle/0.2.md) — the **wire specification of the evidence bundle** (`0.2`): canonical serialization, hash projection and a third-party verification procedure, with [published synthetic vectors](spec/evidence-bundle/0.2/).
 
 Still planned: `architecture.md`, `evidence-schema.md`, `decision-model.md` and `rule-packs.md`.
 

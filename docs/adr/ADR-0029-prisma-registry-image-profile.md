@@ -1,6 +1,9 @@
 # ADR-0029: Offline Prisma Cloud Compute registry-image profile
 
 - **Status:** ratified by the owner (2026-10-03). The **registry JSON profile** is implemented, independently reviewed (`apto tras corregir`, 0 P0/0 P1) and published (2026-10-03). The **registry CSV profile is reserved indefinitely**: its literal header (ES-R1) cannot be closed by evidence because the owner has **no access** to a registry CSV export. Real Prisma compatibility is **not verified**.
+
+> **Distribution clause superseded (2026-10-08):** the statement that distribution of the reports, bundles or exported documents is “not authorized” was withdrawn from the product presentation and from the current-state documentation by [ADR-0039](ADR-0039-state-label-and-distribution-scope.md). The rationale and dated text below are retained as history; the security and accuracy limits of this record still stand.
+
 - **Origin:** task A2-07/A2-08 — "Extend profiles to registry images".
 - **Relationships:** develops the registry scope of [ADR-0020](ADR-0020-prisma-acquisition-and-vulnerability-data.md) ("registry images are a later, separately validated profile"). It is a **new contract, not an extension** of [ADR-0027](ADR-0027-native-prisma-report-ingestion.md), which fixes `report_kind` to `deployed_images` and rejects any other value. It is **offline**: it does not touch the network scope of [ADR-0028](ADR-0028-prisma-api-acquisition-connector.md). It preserves the evidence bundle wire `0.2`, `prisma-v1`, the evaluator, the three decision layers and the identity rules. Supersedes no accepted record.
 
