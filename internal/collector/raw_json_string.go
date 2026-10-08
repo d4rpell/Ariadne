@@ -124,7 +124,10 @@ func (s *rawScanner) scanUnicodeEscape() (rune, bool) {
 		if s.pos+1 >= len(s.data) || s.data[s.pos] != '\\' || s.data[s.pos+1] != 'u' {
 			return 0, false
 		}
-		if !s.scanToken() || !s.scanToken() {
+		if !s.scanToken() {
+			return 0, false
+		}
+		if !s.scanToken() {
 			return 0, false
 		}
 		second, ok := s.scanHex4()

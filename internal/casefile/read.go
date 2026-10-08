@@ -79,7 +79,9 @@ func verifyBook(data []byte) (Book, error) {
 
 func parseBook(data []byte) ([]Record, string, string, error) {
 	p := &parser{data: data}
-	p.enter()
+	if err := p.enter(); err != nil {
+		return nil, "", "", err
+	}
 	if err := p.expect('{'); err != nil {
 		return nil, "", "", err
 	}
@@ -109,7 +111,9 @@ func parseBook(data []byte) ([]Record, string, string, error) {
 	if err := p.expect('['); err != nil {
 		return nil, "", "", err
 	}
-	p.enter()
+	if err := p.enter(); err != nil {
+		return nil, "", "", err
+	}
 
 	records := []Record{}
 	if p.peek() != ']' {
@@ -154,7 +158,9 @@ func (p *parser) parseRecord() (Record, error) {
 	if err := p.expect('{'); err != nil {
 		return record, err
 	}
-	p.enter()
+	if err := p.enter(); err != nil {
+		return record, err
+	}
 	steps := []struct {
 		key    string
 		decode func(*Record) error
@@ -301,7 +307,9 @@ func (p *parser) decodeScope(record *Record) error {
 	if err := p.expect('{'); err != nil {
 		return err
 	}
-	p.enter()
+	if err := p.enter(); err != nil {
+		return err
+	}
 	steps := []struct {
 		key    string
 		decode func(*Scope) error
@@ -571,7 +579,9 @@ func (p *parser) valueStringArray() ([]string, error) {
 	if err := p.expect('['); err != nil {
 		return nil, err
 	}
-	p.enter()
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
 	defer p.leave()
 	values := []string{}
 	if p.peek() == ']' {

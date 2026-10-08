@@ -161,7 +161,7 @@ func (r *runState) acquire(ctx context.Context, operation operationSpec) error {
 		r.noteError(code)
 		return staticError(code)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if code := headerProblem(response); code != "" {
 		r.closeOperation(&record, startSample)
 		record.State = bundle.OperationFailed

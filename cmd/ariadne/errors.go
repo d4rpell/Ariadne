@@ -148,5 +148,5 @@ func writeDiagnostic(stderr io.Writer, failure *cliError) {
 		return
 	}
 	line = append(line, '\n')
-	_, _ = stderr.Write(line)
+	_, _ = stderr.Write(line) //nolint:errcheck // diagnostic to stderr: best-effort, nothing actionable on failure
 }

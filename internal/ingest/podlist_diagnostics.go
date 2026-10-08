@@ -62,7 +62,7 @@ const (
 )
 
 // podListMessages is the exact message of every code (ADR-0025 A.10.2).
-var podListMessages = map[PodListDiagnosticCode]string{
+var podListMessages = map[PodListDiagnosticCode]string{ //nolint:gosec // static diagnostic message table, not a credential (G101 fires on the shape only)
 	PodListCodeInvalidInput:            "invalid input",
 	PodListCodeInvalidContext:          "invalid observation context",
 	PodListCodeUnsupportedSelector:     "unsupported input selector",

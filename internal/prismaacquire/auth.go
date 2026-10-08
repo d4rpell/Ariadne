@@ -45,7 +45,7 @@ func authRequestBody(username, password string) ([]byte, *AcquisitionError) {
 	if hasForbiddenCredentialByte(username) || hasForbiddenCredentialByte(password) {
 		return nil, acquireErr(CodeInvalidConfig, PhaseAuth)
 	}
-	body, err := json.Marshal(authRequest{Username: username, Password: password})
+	body, err := json.Marshal(authRequest{Username: username, Password: password}) //nolint:gosec // the password must travel in the POST body of password_exchange (§5.4); this is the design, not a leak
 	if err != nil || len(body) > maxAuthRequestBytes {
 		// The encoder never returns a partial body; an over-budget body is a
 		// configuration failure, not a remote one.

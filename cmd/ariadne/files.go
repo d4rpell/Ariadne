@@ -96,7 +96,7 @@ type sourceFile interface {
 }
 
 var openSource = func(path string) (sourceFile, error) {
-	return os.Open(path)
+	return os.Open(path) //nolint:gosec // path validated by resolveRoute (fs boundary R-02): regular file only, no symlink/device/FIFO
 }
 
 // readInput reads one bounded input. The route is resolved exactly once and the
@@ -111,7 +111,7 @@ func readInput(path, stage string, limit int64, checkDepth bool, cwd string) ([]
 	if failure != nil {
 		return nil, failure
 	}
-	if info, err := os.Lstat(resolved); err == nil {
+	if info, err := os.Lstat(resolved); err == nil { //nolint:gosec // resolved came from resolveRoute (fs boundary R-02), the only open path
 		if !info.Mode().IsRegular() {
 			return nil, newFailure(stage, codeInvalidFile)
 		}
@@ -165,7 +165,7 @@ type destinationFile interface {
 }
 
 var createDestination = func(path string) (destinationFile, error) {
-	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // path validated by resolveRoute (fs boundary R-02), exclusive create 0600
 }
 
 // writeOutput creates the destination exclusively, confirms with the opened

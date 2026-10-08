@@ -20,9 +20,9 @@ const (
 	CodeInvalidConfig               = "invalid_config"
 	CodeUnsupportedProfile          = "unsupported_profile"
 	CodeUnsupportedAuth             = "unsupported_auth"
-	CodeCredentialUnavailable       = "credential_unavailable"
-	CodeCredentialReferenceMismatch = "credential_reference_mismatch"
-	CodeCredentialExpired           = "credential_expired"
+	CodeCredentialUnavailable       = "credential_unavailable"        //nolint:gosec // diagnostic code string, not a credential
+	CodeCredentialReferenceMismatch = "credential_reference_mismatch" //nolint:gosec // diagnostic code string, not a credential
+	CodeCredentialExpired           = "credential_expired"            //nolint:gosec // diagnostic code string, not a credential
 	CodeTLSConfigInvalid            = "tls_config_invalid"
 	CodeRequestNotAllowed           = "request_not_allowed"
 	CodeAuthFailed                  = "auth_failed"

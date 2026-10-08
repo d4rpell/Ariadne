@@ -13,6 +13,14 @@ import (
 // and performs no network egress.
 const loopbackHost = "127.0.0.1"
 
+// readHeaderTimeout bounds how long a client may take to send the request
+// headers, so a stalled connection cannot hold a request open indefinitely
+// (gosec G112). It is a time.Duration in nanoseconds written as an untyped
+// constant: internal/platform's stdlib allowlist forbids importing "time"
+// (ADR-0014/ADR-0034), and an untyped constant is assignable to the
+// time.Duration field without naming the type.
+const readHeaderTimeout = 10 * 1000 * 1000 * 1000 // 10s
+
 const (
 	contentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
 	contentTypeHTML       = "text/html; charset=utf-8"
@@ -52,7 +60,10 @@ func (server *Server) Serve(port int) error {
 
 // ServeListener serves the read-only handler on an already bound listener.
 func (server *Server) ServeListener(listener net.Listener) error {
-	httpServer := &http.Server{Handler: server.Handler()}
+	httpServer := &http.Server{
+		Handler:           server.Handler(),
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
 	return httpServer.Serve(listener)
 }
 
@@ -139,5 +150,5 @@ func writeDocument(writer http.ResponseWriter, request *http.Request, status int
 	if request.Method == http.MethodHead {
 		return
 	}
-	_, _ = writer.Write(body)
+	_, _ = writer.Write(body) //nolint:errcheck // best-effort write of a small in-memory body; nothing actionable on failure
 }

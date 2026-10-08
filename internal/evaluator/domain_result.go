@@ -76,7 +76,7 @@ func resolveProductStatus(resolution productResolution) (contract.ProductStatus,
 	// detect conflicts, never to publish a branch the pack did not declare. A
 	// lone sustained state without a candidate is still 'no affirmative
 	// candidate' in the table of §9.
-	status := contract.ProductUnderInvestigation
+	var status contract.ProductStatus
 	switch {
 	case blocked:
 		status = contract.ProductUnderInvestigation

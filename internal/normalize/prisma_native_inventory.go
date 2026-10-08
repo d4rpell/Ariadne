@@ -68,7 +68,7 @@ type nativeDiagnosticBuilder struct {
 func (b *nativeDiagnosticBuilder) emit(code, path, locator string) {
 	offset, ok := b.offsets[locator]
 	if !ok {
-		offset, ok = b.offsets[path]
+		offset = b.offsets[path]
 	}
 	pathCopy := path
 	locatorCopy := locator
@@ -260,9 +260,7 @@ func diagFinding(b *nativeDiagnosticBuilder, ptr string, finding ingest.NativeOb
 		switch name {
 		case "cve":
 			diagPresence(b, ptr, name, value)
-			if !identifierDiagnostic(b, ptr+"/cve", value) {
-				// presence already emitted
-			}
+			identifierDiagnostic(b, ptr+"/cve", value)
 		case "cvss":
 			diagPresence(b, ptr, name, value)
 			if num, isNum := value.(ingest.NativeNumber); isNum {

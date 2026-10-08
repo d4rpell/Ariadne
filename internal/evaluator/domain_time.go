@@ -25,8 +25,11 @@ func evidenceCurrent(observedAt, evaluatedAt contract.Timestamp, maximumAgeSecon
 	seconds := evaluatedAt.Unix() - observedAt.Unix()
 	nanoseconds := int64(evaluatedAt.Nanosecond()) - int64(observedAt.Nanosecond())
 	if nanoseconds < 0 {
+		// Unix() truncates both instants towards the past, so a negative
+		// nanosecond remainder means the whole-second difference overstates the
+		// age by one second; borrow it. The corrected remainder is not needed
+		// afterwards because the comparison is on whole seconds.
 		seconds--
-		nanoseconds += 1_000_000_000
 	}
 	if seconds >= maximumAgeSeconds {
 		return false, ReasonExpired

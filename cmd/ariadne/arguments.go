@@ -132,7 +132,7 @@ func parseCommand(command string, admitted flagSet, rest []string) (invocation, 
 		if index+1 >= len(rest) {
 			return invocation{}, newFailure(stageArguments, codeInvalidArguments)
 		}
-		value := rest[index+1]
+		value := rest[index+1] //nolint:gosec // bounds guarded by the check above (G602 cannot follow it)
 		if value == "" || value == "-" || strings.HasPrefix(value, "--") {
 			// An empty value, the exact token `-` — which designates no valid
 			// file in this grammar and must never reach the filesystem as a
