@@ -102,6 +102,24 @@ Core rules:
 
 The public demo runs entirely on synthetic fixtures and needs no access to private infrastructure. The repository now ships a runnable walkthrough — [`docs/quickstart.md`](docs/quickstart.md) builds the CLI and runs `evaluate`, `report` and `verify` over the fixtures, with precomposed contexts and byte-exact receipts under [`examples/synthetic-case/`](examples/synthetic-case/). It demonstrates the offline CLI path, not the full CSV-to-case pipeline: `import` now exists ([ADR-0036](docs/adr/ADR-0036-cli-import-pipeline.md)), while `normalize` does not.
 
+### See it in motion
+
+Two synthetic walkthroughs, generated from the shipped CLI over the repository fixtures — not an integration proof. No cluster and no scanner account are involved; the only network activity is the dashboard served on local loopback.
+
+**Finding → evidence → decision** (offline CLI: `import` → `evaluate` → `report` → `book` → `append` → `diff`):
+
+![Static sheet of the CLI flow walkthrough: a synthetic finding is imported into a hashable bundle, evaluated to under_investigation, rendered as a report, and recorded as a human accepted followed by deferred decision with a validity diff over two declared instants.](docs/assets/ariadne-flow.png)
+
+[Open the animated flow walkthrough (GIF)](docs/assets/ariadne-flow.gif)
+
+**The read-only governance dashboard** (`ariadne serve` over the same casefile book):
+
+![Static sheet of the serve dashboard: book observation, derived summary of standing and risk decisions, the decision records table, and one decision's declaration, scope, controls and derived validity view.](docs/assets/ariadne-serve.png)
+
+[Open the animated dashboard walkthrough (GIF)](docs/assets/ariadne-serve.gif)
+
+Both are presentation only. A full text transcription, the determinism manifest (versions, palette, frame timings, hashes) and the limits are in [`docs/assets/`](docs/assets/README.md).
+
 ## Documentation
 
 User and contributor documentation lives in [`docs/`](docs/). Start with the [quickstart](docs/quickstart.md) to build the CLI and run it over the synthetic fixtures, and see [compatibility](docs/compatibility.md) for what has actually been verified against a cluster. The rest will grow as the implementation lands: architecture, evidence schema, rule pack format and decision model.
